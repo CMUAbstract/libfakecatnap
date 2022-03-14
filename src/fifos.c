@@ -1,12 +1,17 @@
+#include "catnap.h"
+#include <stdio.h>
+#include <libio/console.h>
 
 // Adds event to global event list
 int add_event(evt_t *event) {
+  PRINTF("Adding! %x\r\n",event->evt);
   for (int i = 0; i < MAX_EVENTS; i++) {
-    if (all_events.events[i]->valid == OFF) {
+    if (all_events.events[i] == 0) {
       all_events.events[i] = event;
       break;
     }
     if ( i == MAX_EVENTS - 1) {
+      PRINTF("no room\r\n");
       return 1;  // No room
     }
   }
@@ -19,6 +24,18 @@ int dec_event(evt_t *event) {
   event->valid = OFF;
   return 0;
 }
+
+
+evt_t * pick_event() {
+  for (int i = 0; i < MAX_EVENTS; i++) {
+    if (all_events.events[i]->valid == RDY) {
+      return all_events.events[i];
+    }
+  }
+  return NULL;
+}
+
+
 
 // Push task on global task fifo
 int push_task(task_t *task) {

@@ -1,13 +1,13 @@
+#include "catnap.h"
 
-// Clock running, may not need this separate from Capy
-void init_clock() {
-	CSCTL0_H = CSKEY_H;
-	CSCTL1 = DCOFSEL_6;
-	CSCTL2 = SELM__DCOCLK | SELS__DCOCLK | SELA__VLOCLK;
-	CSCTL3 = DIVA__1 | DIVS__1 | DIVM__1;
-	CSCTL4 = LFXTOFF | HFXTOFF;
-	CSCTL0_H = 0;
+void start_timer(uint16_t time) {
+	// Set and fire Timer A
+	TA0CCR0 = time;
+	TA0CTL = MC_1 | TASSEL_1 | TACLR | ID_3 | TAIE;
+  TA0CCTL0 |= CCIE;
 }
+
+
 
 void init_comparator() {
 	// set up for checkpoint trigger
@@ -19,7 +19,7 @@ void init_comparator() {
   // reconfigure COMP_E
 	CECTL0 = CEIPEN | CEIPSEL_13; //SET_UPPER_THRES(V_1_31);
   //TODO bring in comp.h
-	SET_UPPER_COMP();
+	//SET_UPPER_COMP();
 	CECTL1 = CEPWRMD_2 | CEON; // Ultra low power mode, on
 	// Let the comparator output settle before checking or setting up interrupt
 	while (!CERDYIFG);

@@ -1,9 +1,13 @@
 LIB = libfakecatnap
 
 OBJECTS += \
-  catnap.o
+  catnap.o \
+  events.o \
+  fifos.o \
+  timers.o \
+  hw.o
 
-DEPS +=
+DEPS += libcapybara:gcc
 
 override SRC_ROOT = ../../src
 
