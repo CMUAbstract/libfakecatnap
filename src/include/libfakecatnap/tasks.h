@@ -11,9 +11,10 @@ typedef struct task_ {
 #define TASK(name) TSK_ ## name
 
 
-#define DEC_TSK(name, func)\
+#define DEC_TSK(name, f)\
   task_t TSK_ ## name  =  \
-  { .func = &func; \
+  { .func = &f, \
+    .valid_chkpt = 0\
   }
   
 

@@ -1,12 +1,22 @@
 #include "catnap.h"
 
+#ifndef GDB_INT_CFG
 void start_timer(uint16_t time) {
 	// Set and fire Timer A
 	TA0CCR0 = time;
 	TA0CTL = MC_1 | TASSEL_1 | TACLR | ID_3 | TAIE;
   TA0CCTL0 |= CCIE;
 }
-
+#else
+void start_timer(uint16_t time) {
+	// Set and fire P1.0
+  P1OUT &= ~BIT0;
+  P1REN |= BIT0;
+  P1DIR &= ~BIT0;
+  P1IFG = 0;
+  P1IE |= BIT0;
+}
+#endif
 
 
 void init_comparator() {

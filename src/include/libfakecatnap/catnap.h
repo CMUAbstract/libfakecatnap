@@ -25,7 +25,7 @@ typedef struct context_ {
 } context_t;
 
 
-extern context_t *curctx;
+extern __nv volatile context_t *curctx;
 
 #define MAX_EVENTS 10
 #define MAX_TASKS 10
