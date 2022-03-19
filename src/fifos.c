@@ -62,7 +62,7 @@ int push_task(task_t *task) {
 }
 
 // Returns task at front of fifo
-// TODO double buffer this nonsense
+// TODO double buffer this nonsense-- rework where the metadata lives
 task_t * pop_task() {
   if (all_tasks.tsk_cnt == 0) {
     PRINTF("no tasks!\r\n");

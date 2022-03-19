@@ -19,6 +19,8 @@ __nv volatile context_t context_0 = {0};
 __nv volatile context_t context_1 = {0};
 __nv volatile context_t *curctx = &context_0;
 
+__nv volatile fifo_meta_t fifos_0;
+__nv volatile fifo_meta_t fifos_1;
 // Main function to handle boot and kick us off
 int main(void) {
   // Init capy
@@ -78,6 +80,7 @@ void scheduler(void) {
       if (curctx->active_task != NULL && curctx->active_task->valid_chkpt) {
         context_t *next = (curctx == &context_0 )? &context_1 : &context_0;
         next->active_task = curctx->active_task;
+        next->fifo = curctx->fifo;
         next->active_evt = NULL;
         next->mode = TASK;
         curctx = next;
@@ -124,6 +127,7 @@ void scheduler(void) {
 void COMP_VBANK_ISR (void)
 {
   PRINTF("in comp\r\n");
+  DISABLE_LFCN_TIMER;// Just in case
   switch (__even_in_range(COMP_VBANK(IV), 0x4)) {
     case COMP_INTFLAG2(LIBCAPYBARA_VBANK_COMP_TYPE, IIFG):
         break;
@@ -141,6 +145,7 @@ void COMP_VBANK_ISR (void)
       }
       break;
   }
+  ENABLE_LFCN_TIMER;// Just in case
 }
 
 #ifndef GDB_INT_CFG
