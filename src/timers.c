@@ -12,16 +12,13 @@ void update_event_timers(uint16_t ticks) {
     if (temp_event != 0 && temp_event->valid != OFF) {
       // Reset finished events
       if (temp_event->valid == DONE) {
-        //PRINTF("just ran...%x %u\r\n",temp_event,temp_event->period);
         temp_event->time_rdy = temp_event->period;
         temp_event->valid = WAITING; // needs to be after time_rdy update
       }
       else {
-        //PRINTF("Dec\r\n");
         // Now update ticks waited
         temp_event->time_rdy -= ticks; //TODO need shadow
       }
-      //PRINTF("Evt: %u, time: %i\r\n",temp_event, temp_event->time_rdy);
       // Set ready bits
       if (temp_event->time_rdy <= 0) {
         temp_event->valid = RDY;
@@ -41,7 +38,6 @@ uint16_t get_next_evt_time(void) {
     if (temp_time > 0 && temp_time < min_time) {
       min_time = (uint16_t) temp_time;
     }
-    //PRINTF("\tMin is: %u, temp is:%u\r\n",min_time,temp_time);
   }
   return min_time;
 }

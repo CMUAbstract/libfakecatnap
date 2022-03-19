@@ -31,7 +31,6 @@ void save_stack()
 #if LFCN_LOGGING
   PRINTF("save: stack is from %u to %u\r\n", stack_start, *CURR_SP);
 #endif
-  //PRINTF("ss %u sp %u\r\n", stack_start, *CURR_SP);
   unsigned int* save_point = 0xFBC8;
   // Had to reverse direction because MSP430 stack grows down
   if ((unsigned int)stack_start - (unsigned int)(*(CURR_SP)) > 0x400) {
@@ -41,9 +40,7 @@ void save_stack()
     *save_point = *stack_start;
     save_point++;
     stack_start--;
-    //PRINTF("%u = %u\r\n",*stack_start, *save_point);
   }
- // PRINTF("save pt %u\r\n", save_point);
 }
 
 /*Function that restores the stack from nvmem
@@ -53,7 +50,6 @@ void save_stack()
 void inline restore_stack()
 {
   uint16_t *stack_start = (uint16_t*)(&__stack);
-  //PRINTF("restore: stack is from %u to %u\r\n", stack_start, *((unsigned int*)CURR_SP));
 #if LFCN_LOGGING
   PRINTF("restore: stack is from %u to %u\r\n", stack_start, *CURR_SP);
 #endif
@@ -62,7 +58,6 @@ void inline restore_stack()
     *stack_start = *save_point;
     save_point++;
     stack_start--;
-    //PRINTF("%u = %u\r\n",*stack_start, *save_point);
   }
 }
 
@@ -131,7 +126,6 @@ void restore_vol() {
     PRINTF("Error! Broken checkpoint\r\n");
     return; // Error
     }
-  PRINTF("Restoring\r\n");
   unsigned i = 0;
   chkpt_finished = 0;
   __numBoots +=1;

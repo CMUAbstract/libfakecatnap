@@ -4,7 +4,6 @@
 
 // Adds event to global event list
 int add_event(evt_t *event) {
-  //PRINTF("Adding! %x\r\n",event->evt);
   for (int i = 0; i < MAX_EVENTS; i++) {
     if (all_events.events[i] == 0) {
       all_events.events[i] = event;
@@ -44,7 +43,6 @@ int push_task(task_t *task) {
     return 1; //No room in fifo
   }
   if (all_tasks.back < MAX_TASKS - 1) {
-    PRINTF("Push!\r\n");
     all_tasks.tasks[all_tasks.back] = task;
     all_tasks.back++;
   }
@@ -53,7 +51,6 @@ int push_task(task_t *task) {
     all_tasks.back = 0;
   }
   all_tasks.tsk_cnt++; //TODO double check that this kind of committing works
-  PRINTF("Task count is: %u\r\n",all_tasks.tsk_cnt);
   return 0;
 }
 
@@ -64,7 +61,6 @@ task_t * pop_task() {
     PRINTF("no tasks!\r\n");
     return NULL; // no tasks left
   }
-  PRINTF("Getting task!\r\n");
   all_tasks.tsk_cnt--;
   uint8_t old_front = all_tasks.front;
   if (all_tasks.front < MAX_TASKS - 1) {
