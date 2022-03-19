@@ -4,6 +4,14 @@
 
 // Adds event to global event list
 int add_event(evt_t *event) {
+  // Confirm that event doesn't already exist-- handles repeated writes to the
+  // event array.
+  for (int i = 0; i < MAX_EVENTS; i++) {
+    if (all_events.events[i] == event){
+      //  Event is already present
+      return 1;
+    }
+  }
   for (int i = 0; i < MAX_EVENTS; i++) {
     if (all_events.events[i] == 0) {
       all_events.events[i] = event;
@@ -17,10 +25,9 @@ int add_event(evt_t *event) {
   return 0;
 }
 
-// TODO, could make this more robust and check that it's actually scheduled
 // Pulls event out of global event list
 int dec_event(evt_t *event) {
-  event->valid = OFF;
+  event->valid = OFF; // This is idempotent :-D
   return 0;
 }
 
