@@ -17,16 +17,6 @@ typedef enum activity_ {
   TASK
 } activity_t;
 
-typedef struct context_ {
-  task_t *active_task; //points to any active task we (for instance) interrupted
-  evt_t *active_evt; // points to an event currently running
-  activity_t mode; // defines what we're actually doing
-  uint8_t pwr_lvl; // incoming power level for feasibility estimates
-  fifo_meta_t *fifo; // pointer to data for task fifo so we can double buffer it
-} context_t;
-
-
-extern __nv volatile context_t *curctx;
 
 #define MAX_EVENTS 10
 #define MAX_TASKS 10
@@ -38,17 +28,26 @@ typedef struct evt_list_ {
 
 typedef struct task_fifo_ {
   task_t *tasks[MAX_TASKS];
-  uint8_t tsk_cnt;
-  uint8_t front;
-  uint8_t back;
 } task_fifo_t;
 
 
 typedef struct fifo_meta_ {
   uint8_t tsk_cnt;
   uint8_t front;
-  uint8_t back
+  uint8_t back;
 } fifo_meta_t;
+
+typedef struct context_ {
+  task_t *active_task; //points to any active task we (for instance) interrupted
+  evt_t *active_evt; // points to an event currently running
+  activity_t mode; // defines what we're actually doing
+  uint8_t pwr_lvl; // incoming power level for feasibility estimates
+  fifo_meta_t *fifo; // pointer to data for task fifo so we can double buffer it
+} context_t;
+
+extern __nv volatile context_t *curctx;
+extern __nv volatile fifo_meta_t fifo_0;
+extern __nv volatile fifo_meta_t fifo_1;
 
 // Operations on arrays of events
 int add_event(evt_t *);
@@ -57,6 +56,7 @@ evt_t * pick_event(void);
 
 int push_task(task_t *);
 task_t * pop_task(void);
+void update_task_fifo(context_t *ctx);
 
 // Timer operations
 void update_event_timers(uint16_t);

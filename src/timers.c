@@ -12,8 +12,8 @@ __nv int buffer_done = 0;
 void update_event_timers(uint16_t ticks) {
   for (/*empty*/; timer_i < MAX_EVENTS; timer_i++) {
     if (buffer_done) { //failsafe if we don't finish copy
-      all_events.events[i]->time_rdy = buffer.time_rdy;
-      all_events.events[i]->valid = buffer.valid;
+      all_events.events[timer_i]->time_rdy = buffer.time_rdy;
+      all_events.events[timer_i]->valid = buffer.valid;
       buffer_done = 0;
       continue;
     }
@@ -37,8 +37,8 @@ void update_event_timers(uint16_t ticks) {
         buffer.valid = RDY;
       }
       buffer_done = 1;
-      all_events.events[i]->time_rdy = buffer.time_rdy;
-      all_events.events[i]->valid = buffer.valid;
+      all_events.events[timer_i]->time_rdy = buffer.time_rdy;
+      all_events.events[timer_i]->valid = buffer.valid;
       buffer_done = 0;
     }
   }

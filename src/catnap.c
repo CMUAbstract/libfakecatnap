@@ -12,15 +12,13 @@
 #include <libmsp/periph.h>
 #include <libio/console.h>
 
-__nv evt_list_t all_events = {.events = {0}, .cur_event = MAX_EVENTS+1}; 
-__nv task_fifo_t all_tasks = {.tasks = {0}, .tsk_cnt = 0, .front = 0, .back = 0};
+__nv evt_list_t all_events = {.events = {0}, .cur_event = MAX_EVENTS+1};
+__nv task_fifo_t all_tasks = {.tasks = {0}};
 
-__nv volatile context_t context_0 = {0};
-__nv volatile context_t context_1 = {0};
+__nv volatile context_t context_0 = {NULL,NULL,CHARGING,0,&fifo_0};
+__nv volatile context_t context_1 = {NULL,NULL,CHARGING,0,&fifo_0};
 __nv volatile context_t *curctx = &context_0;
 
-__nv volatile fifo_meta_t fifos_0;
-__nv volatile fifo_meta_t fifos_1;
 // Main function to handle boot and kick us off
 int main(void) {
   // Init capy
@@ -86,12 +84,14 @@ void scheduler(void) {
         curctx = next;
         restore_vol();
       }
-      task_t * nextT = pop_task();
+      task_t * nextT = pop_task(); //Start changes
       if ( nextT != NULL) {
         context_t *next = (curctx == &context_0 )? &context_1 : &context_0;
         next->active_task = nextT;
         next->active_evt = NULL;
         next->mode = TASK;
+        update_task_fifo(next); // Commit changes since we need to wait until the
+                                // task is latched.
         // TODO measure Vcap
         curctx = next;
         // Jump may involve resuming from a checkpoint
