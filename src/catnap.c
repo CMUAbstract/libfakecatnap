@@ -37,19 +37,21 @@ int main(void) {
   return 0; // Should not get here!
 }
 
+__nv uint16_t vstart = 0;
+__nv uint16_t vfinal = 0;
 
 void scheduler(void) {
   while(1) {
     // Why are we entering the loop?
     switch (curctx->mode) {
       case EVENT:
+        vfinal = turn_on_read_adc();
         ticks_waited = TA0R;
         break;
       case TASK:
       case SLEEPING:
         break;
     }
-
     // Update feasibility, etc
     update_event_timers(ticks_waited);
     // Schedule something next
@@ -62,6 +64,7 @@ void scheduler(void) {
       next->active_evt = nextE;
       next->mode = EVENT;
       // TODO measure Vcap
+      vstart = turn_on_read_adc();
       curctx = next;
       // Jump
       __asm__ volatile ( // volatile because output operands unused by C
@@ -157,6 +160,7 @@ timerISRHandler(void) {
 	//TA0CCTL0 &= ~(CCIFG); // Clear flag and stop int
 	CEINT &= ~CEIE; // Disable comp interrupt for our sanity
 /*--------------------------------------------------------*/
+  PRINTF("timera0\r\n");
   // Record wait time
   //ticks_waited = ticks_to_wait;
   ticks_waited = ticks_to_wait;

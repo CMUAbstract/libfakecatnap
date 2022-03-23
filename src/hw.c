@@ -39,5 +39,29 @@ void init_comparator() {
 }
 
 
+uint16_t read_adc(void) {
+  // ======== Configure ADC ========
+  // Take single sample when timer triggers and compare with threshold
+  ADC12IFGR0 &= ~ADC12IFG0;
+  // Use ADC12SC to trigger and single-channel
+  ADC12CTL1 |= ADC12SHP | ADC12SHS_0 | ADC12CONSEQ_0 ;
+  ADC12CTL0 |= (ADC12ON + ADC12ENC + ADC12SC); 			// Trigger ADC conversion
 
+  while(!(ADC12IFGR0 & ADC12IFG0)); 			// Wait till conversion over
+  uint16_t adc_reading = ADC12MEM0; 					// Read ADC value
+  return adc_reading;
+}
 
+/* Doesn't assume that adc is set up before reading*/
+uint16_t turn_on_read_adc(void) {
+  // ======== Configure ADC ========
+  // Take single sample when timer triggers and compare with threshold
+  ADC12IFGR0 &= ~ADC12IFG0;
+  // Use ADC12SC to trigger and single-channel
+  ADC12CTL1 |= ADC12SHP | ADC12SHS_0 | ADC12CONSEQ_0 ;
+  ADC12CTL0 |= (ADC12ON + ADC12ENC + ADC12SC); 			// Trigger ADC conversion
+
+  while(!(ADC12IFGR0 & ADC12IFG0)); 			// Wait till conversion over
+  uint16_t adc_reading = ADC12MEM0; 					// Read ADC value
+  return adc_reading;
+}
