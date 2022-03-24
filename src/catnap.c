@@ -6,6 +6,7 @@
 #include "tasks.h"
 #include "events.h"
 #include "hw.h"
+#include "comp.h"
 #include "checkpoint.h"
 #include <libcapybara/board.h>
 #include <libcapybara/power.h>
@@ -63,7 +64,8 @@ void scheduler(void) {
       next->active_task = curctx->active_task;
       next->active_evt = nextE;
       next->mode = EVENT;
-      // TODO measure Vcap
+      // enable the absolute lowest threshold so we power off if there's a failure
+      SET_LOWER_COMP(V_1_12); //TODO may not need this on camaroptera
       vstart = turn_on_read_adc();
       curctx = next;
       // Jump
@@ -73,10 +75,14 @@ void scheduler(void) {
           : [nt] "r" (curctx->active_evt->evt)
       );
     }
-    else {
+    //else { TODO can we actually leave this out?
       // First set up timers to wait for an event
       ticks_to_wait = get_next_evt_time();
       start_timer(ticks_to_wait);
+      // check if we're above
+    uint16_t temp = turn_on_read_adc();
+    if (temp > event_threshold) { // Only pick a task if we're above the thresh
+      SET_LOWER_COMP(event_bucket); // Interrupt if we got below event thresh
       // Check if there's an active task, and jump to it if there is
       if (curctx->active_task != NULL && curctx->active_task->valid_chkpt) {
         context_t *next = (curctx == &context_0 )? &context_1 : &context_0;
@@ -85,7 +91,7 @@ void scheduler(void) {
         next->active_evt = NULL;
         next->mode = TASK;
         curctx = next;
-        restore_vol();
+        restore_vol(); // Jump to new task
       }
       task_t * nextT = pop_task(); //Start changes
       if ( nextT != NULL) {
@@ -95,9 +101,7 @@ void scheduler(void) {
         next->mode = TASK;
         update_task_fifo(next); // Commit changes since we need to wait until the
                                 // task is latched.
-        // TODO measure Vcap
         curctx = next;
-        // Jump may involve resuming from a checkpoint
         __asm__ volatile ( // volatile because output operands unused by C
             "br %[nt]\n"
             : /* no outputs */
@@ -105,14 +109,16 @@ void scheduler(void) {
         );
       }
     }
+    //}
 
     // Else sleep to recharge
+      SET_MAX_UPPER_COMP(); // Set interrupt when we're fully charged too
       // measure vcap
       // set compE interrupt/timer
       // sleep
     __disable_interrupt();
     int _flag = 0;
-    while(TA0CCTL0 & CCIE) {
+    while(TA0CCTL0 & CCIE) { //TODO expand so we can get out with compE
       __bis_SR_register(LPM3_bits + GIE);
       __disable_interrupt();
       _flag = 1;
@@ -126,28 +132,36 @@ void scheduler(void) {
 
 
 
-
-void COMP_VBANK_ISR (void)
-{
+void COMP_VBANK_ISR (void) {
   PRINTF("in comp\r\n");
   DISABLE_LFCN_TIMER;// Just in case
-  switch (__even_in_range(COMP_VBANK(IV), 0x4)) {
-    case COMP_INTFLAG2(LIBCAPYBARA_VBANK_COMP_TYPE, IIFG):
-        break;
-    case COMP_INTFLAG2(LIBCAPYBARA_VBANK_COMP_TYPE, IFG):
-      COMP_VBANK(INT) &= ~COMP_VBANK(IE);
-      COMP_VBANK(CTL1) &= ~COMP_VBANK(ON);
-      if (curctx->mode == EVENT) {
+  COMP_VBANK(INT) &= ~COMP_VBANK(IE);
+  COMP_VBANK(CTL1) &= ~COMP_VBANK(ON);
+  if (/*Failure imminent*/) {
+    switch (curctx->mode) {
+      case EVENT:
+      case SLEEPING:
         capybara_shutdown();
-      }
-      else {
-        // Checkpoint needs to be **immediately** followed by capybara
-        // shutdown for this to work
+        break;
+      case TASK:
+        volatile int chkpt_flag = 0;
         checkpoint();
-        capybara_shutdown(); //TODO confirm this is a single instruction call
-      }
-      break;
+        chkpt_flag = 1;
+        if (chkpt_flag) {
+          capybara_shutdown();
+        }
+        break;
+      default:
+        break;
+    }
   }
+  else if(/*Discharged to event bucket*/) {
+    /* Stop task, start charging*/
+  }
+  else {/*Charged to max*/
+    /* allow tasks again */
+  }
+  COMP_VBANK(INT) |= COMP_VBANK(IE);
   ENABLE_LFCN_TIMER;// Just in case
 }
 

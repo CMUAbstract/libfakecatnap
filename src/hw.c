@@ -1,5 +1,12 @@
 #include "catnap.h"
 
+
+uint16_t event_threshold = LFCN_STARTER_THRESH; //TODO add levels
+uint16_t vfinal = 0;
+uint16_t vstart = 0;
+uint16_t t_start = 0;
+uint16_t t_end = 0;
+
 #ifndef GDB_INT_CFG
 void start_timer(uint16_t time) {
 	// Set and fire Timer A
