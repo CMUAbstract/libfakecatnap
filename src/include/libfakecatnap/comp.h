@@ -1,6 +1,7 @@
 #ifndef __LCFN_COMP__
 #define __LCFN_COMP__
 #include <libmsp/mem.h>
+#include <stdint.h>
 
 // This is the quanta for energy
 // every energy in the system is a multiple of this
@@ -15,46 +16,125 @@
 // This represents energy in 1.31V - 1.08V
 #define E_OPERATING 3*E_QUANTA 
 
-// These assume a 4.22M : 10M divider
-#define DEFAULT_LOWER_THRES V_1_12
-#define DEFAULT_UPPER_THRES V_1_75
-#define DEFAULT_NEARY_MAX_THRES V_1_75
+#define DEFAULT_LOWER_THRES V_1_82
+#define DEFAULT_MIN_THRES V_1_54
+#define DEFAULT_UPPER_THRES V_2_44
+#define DEFAULT_NEARY_MAX_THRES V_2_44
 // 0.5865
 
-#define THRES_MAX V_2_42
-#define NUM_LEVEL 35
+#define THRES_MAX V_2_48
+#define NUM_LEVEL 55
+
+
+#define LEVEL_MASK 0x7f1f
 
 typedef uint32_t energy_t;
 
-extern volatile energy_t baseline_E;
-extern volatile unsigned lower_thres;
-extern volatile unsigned upper_thres;
-extern volatile unsigned max_thres;
+extern __nv volatile energy_t baseline_E;
+extern __nv volatile unsigned lower_thres;
+extern __nv volatile unsigned upper_thres;
+extern __nv volatile unsigned max_thres;
 extern const energy_t level_to_E[NUM_LEVEL];
 
 //	lower_thres = level;
 #define SET_LOWER_COMP(val)\
+	CECTL0 = CEIMEN | CEIMSEL_13;\
 	CECTL2 |= CEREFL_0;\
 	CECTL2 = CERS_2 | level_to_reg[val];\
 	CECTL2 &= ~CERSEL;\
 	while (!CERDYIFG);\
-	CEINT &= ~(CEIFG | CEIIFG);
+	CEINT &= ~(CEIFG | CEIIFG);\
+  if (CECTL1 & CEOUT) { \
+    CEINT |= CEIFG;\
+  }\
+	CEINT |= CEIE;\
 
 //	upper_thres = level;
 #define SET_UPPER_COMP(val)\
+	CECTL0 = CEIPEN | CEIPSEL_13; \
 	CECTL2 |= CEREFL_0;\
 	CECTL2 = CERS_2 | level_to_reg[val];\
 	CECTL2 |= CERSEL;\
 	while (!CERDYIFG);\
-	CEINT &= ~(CEIFG | CEIIFG);
+	CEINT &= ~(CEIFG | CEIIFG);\
+  if (CECTL1 & CEOUT) {\
+    CEINT |= CEIFG;\
+  }\
+	CEINT |= CEIE;\
 
 #define SET_MAX_UPPER_COMP()\
+	CECTL0 = CEIPEN | CEIPSEL_13; \
 	CECTL2 |= CEREFL_0;\
 	CECTL2 = CERS_2 | level_to_reg[max_thres];\
 	CECTL2 |= CERSEL;\
+  CECTL1 = CEPWRMD_2 | CEON; \
 	while (!CERDYIFG);\
-	CEINT &= ~(CEIFG | CEIIFG);
+	CEINT &= ~(CEIFG | CEIIFG); \
+	CEINT |= CEIE;
+  /*if (CECTL1 & CEOUT) {\
+    CEINT |= CEIFG;\
+  }*/
 
+#if 1
+enum voltage {
+V_1_39 = 0 ,
+V_1_41 = 1 ,
+V_1_43 = 2 ,
+V_1_46 = 3 ,
+V_1_48 = 4 ,
+V_1_50 = 5 ,
+V_1_52 = 6 ,
+V_1_54 = 7 ,
+V_1_56 = 8 ,
+V_1_58 = 9 ,
+V_1_60 = 10 ,
+V_1_62 = 11 ,
+V_1_64 = 12 ,
+V_1_66 = 13 ,
+V_1_68 = 14 ,
+V_1_70 = 15 ,
+V_1_72 = 16 ,
+V_1_74 = 17 ,
+V_1_76 = 18 ,
+V_1_78 = 19 ,
+V_1_80 = 20 ,
+V_1_82 = 21 ,
+V_1_84 = 22 ,
+V_1_86 = 23 ,
+V_1_88 = 24 ,
+V_1_90 = 25 ,
+V_1_92 = 26 ,
+V_1_94 = 27 ,
+V_1_96 = 28 ,
+V_1_98 = 29 ,
+V_2_00 = 30 ,
+V_2_02 = 31 ,
+V_2_04 = 32 ,
+V_2_06 = 33 ,
+V_2_08 = 34 ,
+V_2_10 = 35 ,
+V_2_12 = 36 ,
+V_2_14 = 37 ,
+V_2_16 = 38 ,
+V_2_18 = 39 ,
+V_2_20 = 40 ,
+V_2_22 = 41 ,
+V_2_24 = 42 ,
+V_2_26 = 43 ,
+V_2_28 = 44 ,
+V_2_30 = 45 ,
+V_2_32 = 46 ,
+V_2_34 = 47 ,
+V_2_36 = 48 ,
+V_2_38 = 49 ,
+V_2_40 = 50 ,
+V_2_42 = 51 ,
+V_2_44 = 52 ,
+V_2_46 = 53 ,
+V_2_48 = 54 
+};
+#endif
+#if 0
 // Are these supposed to be evenly spaced?
 enum voltage {
 	V_1_00 = 0,
@@ -93,9 +173,10 @@ enum voltage {
 	V_2_34 = 33,
 	V_2_42 = 34
 };
+#endif
 
-extern const unsigned level_to_reg[35];
-extern const unsigned level_to_volt[35];
+extern const unsigned level_to_reg[NUM_LEVEL];
+extern const unsigned level_to_volt[NUM_LEVEL];
 
 energy_t get_ceiled_level(energy_t e);
 

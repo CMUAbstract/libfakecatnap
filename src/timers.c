@@ -30,7 +30,7 @@ void update_event_timers(uint16_t ticks) {
       }
       else {
         // Now update ticks waited
-        buffer.time_rdy -= ticks; //TODO need shadow
+        buffer.time_rdy -= ticks;
       }
       // Set ready bits
       if (buffer.time_rdy <= 0) {
@@ -42,6 +42,7 @@ void update_event_timers(uint16_t ticks) {
       buffer_done = 0;
     }
   }
+  //PRINTF("ticks:%u\r\n",all_events.events[1]->time_rdy);
   timer_i = 0;
   return;
 }

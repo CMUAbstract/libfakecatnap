@@ -6,6 +6,15 @@ void start_timer(uint16_t time);
 void init_comparator();
 
 uint16_t read_adc();
+uint16_t turn_on_read_adc(void);
+
+
+extern __nv uint16_t event_threshold;
+extern __nv uint16_t vfinal;
+extern __nv uint16_t vstart;
+extern __nv uint16_t t_start;
+extern __nv uint16_t t_end;
+
 
 #ifndef GDB_INT_CFG
 #define DISABLE_LFCN_TIMER TA0CCTL0 &= ~CCIE;
