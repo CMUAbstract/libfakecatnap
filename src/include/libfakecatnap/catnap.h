@@ -77,7 +77,7 @@ extern __nv evt_list_t all_events;
 extern __nv task_fifo_t all_tasks;
 
 // Scheduling variables
-extern __nv uint16_t ticks_waited;
+extern volatile  __nv uint16_t ticks_waited;
 extern volatile uint16_t ticks_to_wait;
 
 

@@ -16,10 +16,10 @@
 // This represents energy in 1.31V - 1.08V
 #define E_OPERATING 3*E_QUANTA 
 
-#define DEFAULT_LOWER_THRES V_1_82
-#define DEFAULT_MIN_THRES V_1_54
+#define DEFAULT_LOWER_THRES V_2_00
+#define DEFAULT_MIN_THRES V_1_60
 #define DEFAULT_UPPER_THRES V_2_44
-#define DEFAULT_NEARY_MAX_THRES V_2_44
+#define DEFAULT_NEARLY_MAX_THRES V_2_44
 // 0.5865
 
 #define THRES_MAX V_2_48
@@ -39,41 +39,44 @@ extern const energy_t level_to_E[NUM_LEVEL];
 //	lower_thres = level;
 #define SET_LOWER_COMP(val)\
 	CECTL0 = CEIMEN | CEIMSEL_13;\
-	CECTL2 |= CEREFL_0;\
+	CECTL2 = CEREFL_0;\
 	CECTL2 = CERS_2 | level_to_reg[val];\
 	CECTL2 &= ~CERSEL;\
+  CECTL1 = CEPWRMD_2 | CEON; \
 	while (!CERDYIFG);\
 	CEINT &= ~(CEIFG | CEIIFG);\
+	CEINT |= CEIE;\
   if (CECTL1 & CEOUT) { \
     CEINT |= CEIFG;\
-  }\
-	CEINT |= CEIE;\
+  }
+
 
 //	upper_thres = level;
 #define SET_UPPER_COMP(val)\
 	CECTL0 = CEIPEN | CEIPSEL_13; \
-	CECTL2 |= CEREFL_0;\
+	CECTL2 = CEREFL_0;\
 	CECTL2 = CERS_2 | level_to_reg[val];\
 	CECTL2 |= CERSEL;\
+  CECTL1 = CEPWRMD_2 | CEON; \
 	while (!CERDYIFG);\
 	CEINT &= ~(CEIFG | CEIIFG);\
+	CEINT |= CEIE;\
   if (CECTL1 & CEOUT) {\
     CEINT |= CEIFG;\
-  }\
-	CEINT |= CEIE;\
+  }
 
 #define SET_MAX_UPPER_COMP()\
 	CECTL0 = CEIPEN | CEIPSEL_13; \
-	CECTL2 |= CEREFL_0;\
+	CECTL2 = CEREFL_0;\
 	CECTL2 = CERS_2 | level_to_reg[max_thres];\
 	CECTL2 |= CERSEL;\
   CECTL1 = CEPWRMD_2 | CEON; \
 	while (!CERDYIFG);\
 	CEINT &= ~(CEIFG | CEIIFG); \
-	CEINT |= CEIE;
-  /*if (CECTL1 & CEOUT) {\
+	CEINT |= CEIE;\
+  if (CECTL1 & CEOUT) {\
     CEINT |= CEIFG;\
-  }*/
+  }
 
 #if 1
 enum voltage {

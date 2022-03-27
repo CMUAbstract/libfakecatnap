@@ -39,9 +39,18 @@ int main(void) {
   capybara_init(); // TODO may want to slim down
   PRINTF("Boot\r\n");
   // Init timer
+  //__delay_cycles(800000); //TODO take out
   ENABLE_LFCN_TIMER;
   // Init comparator
   init_comparator();
+  PRINTF("start %x\r\n",CECTL2);
+
+  P3SEL1 |= BIT5;
+  P3SEL0 &= ~(BIT5);
+  P3DIR |= BIT5;
+  //__bis_SR_register(LPM3_bits | GIE);//sleep?
+  //PRINTF("Wake!\r\n");
+  //SET_LOWER_COMP(DEFAULT_MIN_THRES);//Happens in isr
   // on very first boot, pull in starter event
   add_event(&EVT_FCN_STARTER);
   // Run the whole shebang
@@ -56,7 +65,7 @@ void scheduler(void) {
     switch (curctx->mode) {
       case EVENT:
         vfinal = turn_on_read_adc();
-        PRINTF("event! %u\r\n",tasks_ok);
+        PRINTF("event! %u\r\n",TA0R);
         /*TODO run feasibility*/
         //TODO fis this setting, we need to account for event time
         //ticks_waited = TA0R;
@@ -64,37 +73,11 @@ void scheduler(void) {
       case TASK:
       case SLEEPING:
       case CHARGING:
-        PRINTF("not event!\r\n");
+        PRINTF("not event! %u\r\n",TA0R);
         break;
-    }
-    SET_LOWER_COMP(V_1_90); // Interrupt if we got below event thresh
-    test_flag = 0;
-    while(1) {
-      PRINTF("lOOP!\r\n");
-      __delay_cycles(80);
-      if (test_flag) {
-        PRINTF("Gone!\r\n");
-        break;
-      }
-    }
-    BIT_FLIP(1,4);
-    BIT_FLIP(1,4);
-    BIT_FLIP(1,4);
-    BIT_FLIP(1,4);
-    BIT_FLIP(1,4);
-    BIT_FLIP(1,4);
-    BIT_FLIP(1,4);
-	  CEINT &= ~(CEIFG | CEIIFG);
-    //SET_UPPER_COMP(V_2_30); // Interrupt if we got below event thresh
-    SET_MAX_UPPER_COMP();
-    while(1) {
-      __bis_SR_register(LPM3_bits | GIE);
-    BIT_FLIP(1,4);
-    BIT_FLIP(1,4);
-    BIT_FLIP(1,4);
-    BIT_FLIP(1,4);
     }
     // Update feasibility, etc
+    PRINTF("ticks:%u\r\n",ticks_waited);
     update_event_timers(ticks_waited);
     // Schedule something next
     evt_t * nextE = pick_event();
@@ -102,7 +85,7 @@ void scheduler(void) {
     // If event, measure vcap
     if (nextE != NULL) {
       //PRINTF("NEXTE\r\n");
-      __delay_cycles(80000); //TODO remove
+      //__delay_cycles(80000); //TODO remove
       // Swap context
       context_t *next = (curctx == &context_0 )? &context_1 : &context_0;
       next->active_task = curctx->active_task;
@@ -112,7 +95,7 @@ void scheduler(void) {
       PRINTF("Set low thresh %x\r\n",nextE);
       BIT_FLIP(1,1);
       BIT_FLIP(1,1);
-      SET_LOWER_COMP(V_1_60); //TODO may not need this on camaroptera
+      SET_LOWER_COMP(DEFAULT_MIN_THRES); //TODO may not need this on camaroptera
       vstart = turn_on_read_adc();
       curctx = next;
       // Jump
@@ -126,13 +109,14 @@ void scheduler(void) {
     //else { TODO can we actually leave this out?
       // First set up timers to wait for an event
     ticks_to_wait = get_next_evt_time();
+    PRINTF("To wait: %u\r\n",ticks_to_wait);
     start_timer(ticks_to_wait);
     // check if we're above
     uint16_t temp = turn_on_read_adc();
-    PRINTF("ADC: %u\r\n",temp);
+    //PRINTF("ADC: %u\r\n",temp);
     if (temp > event_threshold && tasks_ok) { // Only pick a task if we're above the thresh
       PRINTF("Set thresh %u, tasks ok: %u\r\n",event_threshold,tasks_ok);
-      SET_LOWER_COMP(event_threshold); // Interrupt if we got below event thresh
+      SET_LOWER_COMP(DEFAULT_LOWER_THRES); // Interrupt if we got below event thresh
       // Check if there's an active task, and jump to it if there is
       if (curctx->active_task != NULL && curctx->active_task->valid_chkpt) {
         context_t *next = (curctx == &context_0 )? &context_1 : &context_0;
@@ -197,28 +181,25 @@ __attribute__ ((interrupt(COMP_E_VECTOR)))
 void COMP_VBANK_ISR (void) {
   //PRINTF("in comp\r\n");
   COMP_VBANK(INT) &= ~COMP_VBANK(IE);
-  COMP_VBANK(CTL1) &= ~COMP_VBANK(ON);
+  //COMP_VBANK(CTL1) &= ~COMP_VBANK(ON);
   DISABLE_LFCN_TIMER;// Just in case
   BIT_FLIP(1,4);
   BIT_FLIP(1,4);
-  PRINTF("comp\r\n");
+  //PRINTF("comp\r\n");
   volatile int chkpt_flag = 0;
   if (!(CECTL2 & CERSEL)) {
-  test_flag = 1; //TODO remove
-  BIT_FLIP(1,4);
-  PRINTF("comp1\r\n");
-  BIT_FLIP(1,4);
-  return;//TODO remove
-  PRINTF("comp3\r\n");
+  //PRINTF("comp3\r\n");
     if ((LEVEL_MASK & CECTL2) == level_to_reg[DEFAULT_MIN_THRES]) {
+      //PRINTF("comp4\r\n");
       switch (curctx->mode) {
         case CHARGING:
         case EVENT:
         case SLEEPING:{
-          BIT_FLIP(1,4);
-          BIT_FLIP(1,5);
-          BIT_FLIP(1,5);
-          BIT_FLIP(1,4);
+          BIT_FLIP(1,0);
+          BIT_FLIP(1,0);
+          BIT_FLIP(1,0);
+          BIT_FLIP(1,0);
+          ticks_waited = TA0R;
           capybara_shutdown();
           break;
         }
@@ -226,6 +207,10 @@ void COMP_VBANK_ISR (void) {
           checkpoint();
           chkpt_flag = 1;
           if (chkpt_flag) {
+            ticks_waited = TA0R;
+            BIT_FLIP(1,0);
+            BIT_FLIP(1,0);
+            BIT_FLIP(1,0);
             capybara_shutdown();
           }
           break;
@@ -235,16 +220,16 @@ void COMP_VBANK_ISR (void) {
       }
     }
     else { /* We hit the event bucket threshold*/ /* Stop task, jump back to scheduler so we start charging*/
-    PRINTF("comp2\r\n");
-    BIT_FLIP(1,4);
-    BIT_FLIP(1,5);
-    BIT_FLIP(1,4);
+    //PRINTF("comp2 %x\r\n",CECTL2);
       tasks_ok = 0;
       volatile int chkpt_flag = 0;
       checkpoint();
       chkpt_flag = 1;
       // Jump to scheduler
       if ( chkpt_flag == 1) {
+        BIT_FLIP(1,0);
+        BIT_FLIP(1,0);
+        ticks_waited = TA0R;
         __asm__ volatile ( // volatile because output operands unused by C
             "br %[nt]\n"
             : /* no outputs */
@@ -254,20 +239,20 @@ void COMP_VBANK_ISR (void) {
     }
   }
   else {/*Charged to max*/
-    /* allow tasks again */
-    __bic_SR_register_on_exit(LPM3_bits); //TODO remove
-    return; //TODO remove
-    
+    /* allow tasks again */ 
     BIT_FLIP(1,4);
     BIT_FLIP(1,4);
     BIT_FLIP(1,4);
     BIT_FLIP(1,4);
     // SWitch to worrying about the minimum
+    PRINTF("Set min!\r\n");
     SET_LOWER_COMP(DEFAULT_MIN_THRES);
+    ticks_waited = TA0R;
     __bic_SR_register_on_exit(LPM3_bits); //wake up
     comp_e_flag = 0;
     tasks_ok = 1;
   }
+  BIT_FLIP(1,0);
   COMP_VBANK(INT) |= COMP_VBANK(IE);
   ENABLE_LFCN_TIMER;// Just in case
 }
@@ -281,6 +266,8 @@ timerISRHandler(void) {
 	CEINT &= ~CEIE; // Disable comp interrupt for our sanity
   PRINTF("Timer %u\r\n",curctx->mode);
 /*--------------------------------------------------------*/
+  BIT_FLIP(1,5);
+  BIT_FLIP(1,5);
   BIT_FLIP(1,5);
   //PRINTF("timera0\r\n");
   // Record wait time

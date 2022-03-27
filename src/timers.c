@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <libio/console.h>
 
-__nv uint16_t ticks_waited = 0;
+volatile __nv uint16_t ticks_waited = 0;
 volatile uint16_t ticks_to_wait = 0;
 
 __nv int timer_i = 0;
