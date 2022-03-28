@@ -9,6 +9,15 @@
 //Debug logging, not checkpoint logging
 #define LFCN_LOGGING 0
 
+#ifndef BIT_FLIP
+
+#define BIT_FLIP(port,bit) \
+	P##port##OUT |= BIT##bit; \
+	P##port##DIR |= BIT##bit; \
+	P##port##OUT &= ~BIT##bit; \
+
+#endif
+
 __nv unsigned chkpt_finished = 0;
 
 __nv unsigned __numBoots = 0;
@@ -115,6 +124,11 @@ void checkpoint() {
   save_stack();
   __asm__ volatile ("MOVX.A &0x0FB90, R4");
   curctx->active_task->valid_chkpt = 1;
+  BIT_FLIP(1,0);
+  BIT_FLIP(1,0);
+  BIT_FLIP(1,0);
+  BIT_FLIP(1,0);
+  BIT_FLIP(1,0);
   chkpt_finished = 1;
 }
 

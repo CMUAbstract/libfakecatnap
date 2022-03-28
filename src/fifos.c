@@ -72,6 +72,7 @@ task_t * pop_task() {
     PRINTF("no tasks!\r\n");
     return NULL; // no tasks left
   }
+  PRINTF("New task!\r\n");
   fifo_meta_t *next_fifo = curctx->fifo == &fifo_0 ? &fifo_1 : &fifo_0;
   next_fifo->tsk_cnt = curctx->fifo->tsk_cnt - 1; 
   uint8_t old_front = curctx->fifo->front;

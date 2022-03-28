@@ -19,10 +19,23 @@ extern __nv uint16_t t_end;
 #ifndef GDB_INT_CFG
 #define DISABLE_LFCN_TIMER TA0CCTL0 &= ~CCIE;
 #define ENABLE_LFCN_TIMER TA0CCTL0 |= CCIE;
+
+#define LCFN_INTERRUPTS_DISABLE \
+  TA0CCTL0 &= ~CCIE; \
+	CEINT &= ~(CEIE | CEIIE);
+
+#define LCFN_INTERRUPTS_ENABLE \
+  TA0CCTL0 |= CCIE; \
+	CEINT |= (CEIE | CEIIE);
+  
 #else
 
 #define DISABLE_LFCN_TIMER P1IE &= ~BIT0;
 #define ENABLE_LFCN_TIMER P1IE |= BIT0;
+
+#define LCFN_INTERRUPTS_DISABLE \
+  P1IE &= ~BIT0;\
+	CEINT = ~(CEIE | CEIIE);
 
 #endif
 

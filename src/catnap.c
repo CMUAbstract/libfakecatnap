@@ -40,10 +40,11 @@ int main(void) {
   PRINTF("Boot\r\n");
   // Init timer
   //__delay_cycles(800000); //TODO take out
+  //tasks_ok = 0;
   ENABLE_LFCN_TIMER;
   // Init comparator
   init_comparator();
-  PRINTF("start %x\r\n",CECTL2);
+  //PRINTF("start %x\r\n",CECTL2);
 
   P3SEL1 |= BIT5;
   P3SEL0 &= ~(BIT5);
@@ -61,11 +62,12 @@ int main(void) {
 
 void scheduler(void) {
   while(1) {
+    LCFN_INTERRUPTS_DISABLE;
     // Why are we entering the loop?
     switch (curctx->mode) {
       case EVENT:
         vfinal = turn_on_read_adc();
-        PRINTF("event! %u\r\n",TA0R);
+        PRINTF("event! %x\r\n",curctx->active_task);
         /*TODO run feasibility*/
         //TODO fis this setting, we need to account for event time
         //ticks_waited = TA0R;
@@ -73,11 +75,12 @@ void scheduler(void) {
       case TASK:
       case SLEEPING:
       case CHARGING:
-        PRINTF("not event! %u\r\n",TA0R);
+        PRINTF("not event! %x\r\n",curctx->mode);
+        curctx->mode = CHARGING;
         break;
     }
     // Update feasibility, etc
-    PRINTF("ticks:%u\r\n",ticks_waited);
+    //PRINTF("ticks:%u\r\n",ticks_waited);
     update_event_timers(ticks_waited);
     // Schedule something next
     evt_t * nextE = pick_event();
@@ -92,11 +95,12 @@ void scheduler(void) {
       next->active_evt = nextE;
       next->mode = EVENT;
       // enable the absolute lowest threshold so we power off if there's a failure
-      PRINTF("Set low thresh %x\r\n",nextE);
+      //PRINTF("Set low thresh %x\r\n",nextE);
       BIT_FLIP(1,1);
       BIT_FLIP(1,1);
       SET_LOWER_COMP(DEFAULT_MIN_THRES); //TODO may not need this on camaroptera
       vstart = turn_on_read_adc();
+      LCFN_INTERRUPTS_ENABLE;
       curctx = next;
       // Jump
       __asm__ volatile ( // volatile because output operands unused by C
@@ -109,15 +113,19 @@ void scheduler(void) {
     //else { TODO can we actually leave this out?
       // First set up timers to wait for an event
     ticks_to_wait = get_next_evt_time();
-    PRINTF("To wait: %u\r\n",ticks_to_wait);
+    //PRINTF("To wait: %u\r\n",ticks_to_wait);
     start_timer(ticks_to_wait);
     // check if we're above
     uint16_t temp = turn_on_read_adc();
     //PRINTF("ADC: %u\r\n",temp);
+    BIT_FLIP(1,5);
+    BIT_FLIP(1,5);
+    BIT_FLIP(1,5);
     if (temp > event_threshold && tasks_ok) { // Only pick a task if we're above the thresh
-      PRINTF("Set thresh %u, tasks ok: %u\r\n",event_threshold,tasks_ok);
+      //PRINTF("Set thresh %u, tasks ok: %u\r\n",event_threshold,tasks_ok);
       SET_LOWER_COMP(DEFAULT_LOWER_THRES); // Interrupt if we got below event thresh
       // Check if there's an active task, and jump to it if there is
+      //PRINTF("chkpt: %u,active task? %x, \r\n",curctx->active_task->valid_chkpt,curctx->active_task);
       if (curctx->active_task != NULL && curctx->active_task->valid_chkpt) {
         context_t *next = (curctx == &context_0 )? &context_1 : &context_0;
         next->active_task = curctx->active_task;
@@ -127,8 +135,9 @@ void scheduler(void) {
         BIT_FLIP(1,4);
         BIT_FLIP(1,4);
         next->mode = TASK;
+        PRINTF("1mode:%u\r\n",curctx->mode);
+        LCFN_INTERRUPTS_ENABLE;
         curctx = next;
-        PRINTF("mode:%u\r\n",curctx->mode);
         restore_vol(); // Jump to new task
       }
       task_t * nextT = pop_task(); //Start changes
@@ -143,6 +152,7 @@ void scheduler(void) {
         BIT_FLIP(1,4);
         BIT_FLIP(1,4);
         PRINTF("mode:%u\r\n",curctx->mode);
+        LCFN_INTERRUPTS_ENABLE;
         curctx = next;
         __asm__ volatile ( // volatile because output operands unused by C
             "br %[nt]\n"
@@ -160,6 +170,7 @@ void scheduler(void) {
     // measure vcap
     // set compE interrupt/timer
     // sleep
+    LCFN_INTERRUPTS_ENABLE;
     //PRINTF("Sleeping for %u = %u",TA0CCR0,ticks_to_wait);
     __disable_interrupt();
     comp_e_flag = 1; // Flag to get us out
@@ -204,6 +215,7 @@ void COMP_VBANK_ISR (void) {
           break;
         }
         case TASK:{
+          PRINTF("Chkpt!\r\n");
           checkpoint();
           chkpt_flag = 1;
           if (chkpt_flag) {
@@ -211,7 +223,13 @@ void COMP_VBANK_ISR (void) {
             BIT_FLIP(1,0);
             BIT_FLIP(1,0);
             BIT_FLIP(1,0);
+            curctx->mode = CHARGING;
             capybara_shutdown();
+          }
+          else {
+            curctx->mode = TASK;
+            //TODO: may need to add ticks here
+            return;
           }
           break;
         }
@@ -222,19 +240,28 @@ void COMP_VBANK_ISR (void) {
     else { /* We hit the event bucket threshold*/ /* Stop task, jump back to scheduler so we start charging*/
     //PRINTF("comp2 %x\r\n",CECTL2);
       tasks_ok = 0;
-      volatile int chkpt_flag = 0;
+      if (curctx->mode != TASK) {
+        return; // If we're not in a task just return w/out a checkpoint
+      }
+      volatile int chkpt_flag;
+      chkpt_flag = 0;
+      PRINTF("Chkpt2!\r\n");
       checkpoint();
       chkpt_flag = 1;
       // Jump to scheduler
       if ( chkpt_flag == 1) {
         BIT_FLIP(1,0);
         BIT_FLIP(1,0);
+        curctx->mode = CHARGING;
         ticks_waited = TA0R;
         __asm__ volatile ( // volatile because output operands unused by C
             "br %[nt]\n"
             : /* no outputs */
             : [nt] "r" (&scheduler)
         );
+      }
+      else {
+        PRINTF("Ret2\r\n");
       }
     }
   }
@@ -277,16 +304,18 @@ timerISRHandler(void) {
   if ( curctx->mode == TASK) {
     volatile int chkpt_flag = 0;
     BIT_FLIP(1,5);
+    PRINTF("Chkpt3! %u\r\n",curctx->active_task->valid_chkpt);
     checkpoint();
     chkpt_flag = 1;
     // Jump to scheduler
     if ( chkpt_flag == 1) {
       __asm__ volatile ( // volatile because output operands unused by C
           "br %[nt]\n"
-          : /* no outputs */
+          : /* no outpums */
           : [nt] "r" (&scheduler)
       );
     }
+    PRINTF("Ret3\r\n");
     return;
   }
   BIT_FLIP(1,5);
