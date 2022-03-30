@@ -6,8 +6,8 @@
 uint16_t __nv event_threshold = LFCN_STARTER_THRESH; //TODO add levels
 uint16_t __nv vfinal = 0;
 uint16_t __nv vstart = 0;
-uint16_t __nv t_start = 0;
-uint16_t __nv t_end = 0;
+uint16_t t_start = 0;
+uint16_t t_end = 0;
 
 #ifndef GDB_INT_CFG
 void start_timer(uint16_t time) {
@@ -87,5 +87,12 @@ uint16_t turn_on_read_adc(void) {
 	ADC12CTL0 &= ~ADC12ENC;                 // Disable conversions
 	ADC12CTL0 &= ~(ADC12ON);                // Shutdown ADC12
 	REFCTL0 &= ~REFON;
-	return output;
+  // 100*Vcap = adc_val * 2.56 * 2 * 100 / 4096	
+	// 100 is to not use float
+  // 2 is for the Vcap divider
+  // 2.56 is Capy's Vdd
+  // The absurdly satisfying simplification is below... You're welcome.
+  output = output >> 3;
+  // Cheat sheet: 100*Vcap = adc_val/8
+	return (unsigned)output;
 }

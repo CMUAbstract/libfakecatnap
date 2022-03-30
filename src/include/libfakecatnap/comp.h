@@ -21,6 +21,8 @@
 #define DEFAULT_UPPER_THRES V_2_44
 #define DEFAULT_NEARLY_MAX_THRES V_2_44
 // 0.5865
+#define V_NEARLY_MAX 260
+
 
 #define THRES_MAX V_2_48
 #define NUM_LEVEL 55
@@ -48,7 +50,8 @@ extern const energy_t level_to_E[NUM_LEVEL];
 	CEINT |= CEIE;\
   if (CECTL1 & CEOUT) { \
     CEINT |= CEIFG;\
-  }
+  }\
+  CEINT &= ~(CEIE | CEIIE);
 
 
 //	upper_thres = level;
@@ -63,7 +66,8 @@ extern const energy_t level_to_E[NUM_LEVEL];
 	CEINT |= CEIE;\
   if (CECTL1 & CEOUT) {\
     CEINT |= CEIFG;\
-  }
+  }\
+  CEINT &= ~(CEIE | CEIIE);
 
 #define SET_MAX_UPPER_COMP()\
 	CECTL0 = CEIPEN | CEIPSEL_13; \
@@ -76,7 +80,8 @@ extern const energy_t level_to_E[NUM_LEVEL];
 	CEINT |= CEIE;\
   if (CECTL1 & CEOUT) {\
     CEINT |= CEIFG;\
-  }
+  }\
+  CEINT &= ~(CEIE | CEIIE);
 
 #if 1
 enum voltage {

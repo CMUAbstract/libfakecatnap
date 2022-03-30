@@ -12,8 +12,8 @@ uint16_t turn_on_read_adc(void);
 extern __nv uint16_t event_threshold;
 extern __nv uint16_t vfinal;
 extern __nv uint16_t vstart;
-extern __nv uint16_t t_start;
-extern __nv uint16_t t_end;
+extern uint16_t t_start;
+extern uint16_t t_end;
 
 
 #ifndef GDB_INT_CFG

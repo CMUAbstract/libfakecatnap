@@ -7,6 +7,7 @@
 #include "events.h"
 #include "hw.h"
 #include "comp.h"
+#include "scheduler.h"
 #include "checkpoint.h"
 #include <libcapybara/board.h>
 #include <libcapybara/power.h>
@@ -31,7 +32,7 @@ __nv volatile context_t context_1 = {NULL,NULL,CHARGING,0,&fifo_0};
 __nv volatile context_t *curctx = &context_0;
 
 __nv uint8_t comp_e_flag = 1;
-__nv uint8_t tasks_ok = 1;
+volatile __nv uint8_t tasks_ok = 1;
 
 // Main function to handle boot and kick us off
 int main(void) {
@@ -49,11 +50,11 @@ int main(void) {
   P3SEL1 |= BIT5;
   P3SEL0 &= ~(BIT5);
   P3DIR |= BIT5;
-  //__bis_SR_register(LPM3_bits | GIE);//sleep?
-  //PRINTF("Wake!\r\n");
-  //SET_LOWER_COMP(DEFAULT_MIN_THRES);//Happens in isr
   // on very first boot, pull in starter event
   add_event(&EVT_FCN_STARTER);
+  // Clear a couple variables after a reboot
+  vfinal = 0;
+  vstart = 0;//TODO should these be NV at all?
   // Run the whole shebang
   scheduler();
 
@@ -67,7 +68,8 @@ void scheduler(void) {
     switch (curctx->mode) {
       case EVENT:
         vfinal = turn_on_read_adc();
-        PRINTF("event! %x\r\n",curctx->active_task);
+        calculate_energy_use(curctx->active_evt,vstart,vfinal);
+        PRINTF("event! %x\r\n",sizeof(unsigned));
         /*TODO run feasibility*/
         //TODO fis this setting, we need to account for event time
         //ticks_waited = TA0R;
@@ -75,7 +77,7 @@ void scheduler(void) {
       case TASK:
       case SLEEPING:
       case CHARGING:
-        PRINTF("not event! %x\r\n",curctx->mode);
+        PRINTF("not event! %x\r\n",tasks_ok);
         curctx->mode = CHARGING;
         break;
     }
@@ -165,6 +167,11 @@ void scheduler(void) {
     BIT_FLIP(1,1);
     BIT_FLIP(1,1);
     BIT_FLIP(1,1);
+    // Grab starting voltage if we're sleeping
+    if (curctx->mode != TASK) {
+      v_charge_start = turn_on_read_adc();
+      t_start = TA0R;//TODO is the timer running here?
+    }
     // Else sleep to recharge
     SET_MAX_UPPER_COMP(); // Set interrupt when we're fully charged too
     // measure vcap
@@ -174,11 +181,33 @@ void scheduler(void) {
     //PRINTF("Sleeping for %u = %u",TA0CCR0,ticks_to_wait);
     __disable_interrupt();
     comp_e_flag = 1; // Flag to get us out
+    BIT_FLIP(1,1);
+    BIT_FLIP(1,1);
+    BIT_FLIP(1,1);
+    BIT_FLIP(1,1);
+    BIT_FLIP(1,1);
+    BIT_FLIP(1,1);
     while((TA0CCTL0 & CCIE) && comp_e_flag) { //TODO expand so we can get out with compE
       __bis_SR_register(LPM3_bits + GIE);
       __disable_interrupt();
     }
-
+    BIT_FLIP(1,1);
+    BIT_FLIP(1,1);
+    BIT_FLIP(1,1);
+    BIT_FLIP(1,1);
+    BIT_FLIP(1,1);
+    if (curctx->mode != TASK) {
+      v_charge_end = turn_on_read_adc();
+      if (!comp_e_flag) {
+        t_end = TA0R;//we were woken up by the comparator
+      }
+      else {
+        t_end = ticks_waited - t_start; //woken up by timer which clobbered ta0r
+      }
+      calculate_charge_rate(t_end,t_start);
+      t_end = 0;// this is ok because these vars are volatile
+      t_start = 0;
+    }
     __enable_interrupt();
     PRINTF("Wake!\r\n");
   }
@@ -272,7 +301,7 @@ void COMP_VBANK_ISR (void) {
     BIT_FLIP(1,4);
     BIT_FLIP(1,4);
     // SWitch to worrying about the minimum
-    PRINTF("Set min!\r\n");
+    PRINTF("Set min! %x\r\n",LEVEL_MASK & CECTL2);
     SET_LOWER_COMP(DEFAULT_MIN_THRES);
     ticks_waited = TA0R;
     __bic_SR_register_on_exit(LPM3_bits); //wake up
@@ -293,6 +322,7 @@ timerISRHandler(void) {
 	CEINT &= ~CEIE; // Disable comp interrupt for our sanity
   PRINTF("Timer %u\r\n",curctx->mode);
 /*--------------------------------------------------------*/
+  BIT_FLIP(1,5);
   BIT_FLIP(1,5);
   BIT_FLIP(1,5);
   BIT_FLIP(1,5);

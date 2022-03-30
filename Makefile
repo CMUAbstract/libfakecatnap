@@ -7,12 +7,13 @@ OBJECTS += \
   timers.o \
   checkpoint.o \
   hw.o \
-  comp.o
+  comp.o \
+  scheduler.o
 
 DEPS += libcapybara:gcc
 
-# 2.0V for ADC with 1M:1M divider
-LIBFCN_EVENT_THRESHOLD = 1600
+# 2.0V, (2.0*100) and our alg takes care of it
+LIBFCN_EVENT_THRESHOLD = 200
 LIBFCN_COMP_PIN_PORT = 3
 LIBFCN_COMP_PIN_PIN = 1
 

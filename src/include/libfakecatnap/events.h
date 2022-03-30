@@ -15,6 +15,9 @@ typedef struct evt_ {
   evt_func_t *evt;
   // Starting voltage, may need to be a table
   uint16_t vltg;
+  uint32_t energy;
+  uint32_t charge_time;
+  uint16_t burst_num;
   int16_t time_rdy;
   evt_valid_t valid;
   uint16_t period;
@@ -22,12 +25,12 @@ typedef struct evt_ {
 
 #define EVENT(name) EVT_ ## name
 
-
 #define DEC_EVT(name, func, per)\
   evt_t EVT_ ## name  =  \
   { .evt = &func, \
     .vltg = 0, \
     .period = per, \
+    .burst_num = 1, \
     .time_rdy = per, \
     .valid = WAITING, \
   }
