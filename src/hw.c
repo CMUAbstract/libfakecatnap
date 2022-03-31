@@ -2,7 +2,7 @@
 #include "hw.h"
 #include <libmsp/periph.h>
 #include "comp.h"
-
+#include <libio/console.h>
 uint16_t __nv event_threshold = LFCN_STARTER_THRESH; //TODO add levels
 uint16_t __nv vfinal = 0;
 uint16_t __nv vstart = 0;
@@ -62,7 +62,7 @@ uint16_t read_adc(void) {
 }
 
 /* Doesn't assume that adc is set up before reading*/
-uint16_t turn_on_read_adc(void) {
+uint16_t turn_on_read_adc(uint16_t scaler) {
 	ADC12CTL0 &= ~ADC12ENC;           // Disable conversions
 
 	ADC12CTL1 = ADC12SHP; // SAMPCON is sourced from the sampling timer
@@ -92,7 +92,13 @@ uint16_t turn_on_read_adc(void) {
   // 2 is for the Vcap divider
   // 2.56 is Capy's Vdd
   // The absurdly satisfying simplification is below... You're welcome.
-  output = output >> 3;
+  if (scaler == 100) {
+    output = output >> 3;
+  }
+  else if (scaler == 1000) {
+    // With scaler == 1000 we're multiplying by 1.25, so 5/4
+    output = (output * 5) >> 2;
+  }
   // Cheat sheet: 100*Vcap = adc_val/8
 	return (unsigned)output;
 }

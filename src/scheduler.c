@@ -28,6 +28,7 @@ void update_comp()
   //(unsigned)(energy_budget & 0xFFFF));
 	//PRINTF("Worst: %x %x\r\n", (unsigned)(worst_case_energy >> 16),
   //(unsigned)(worst_case_energy & 0xFFFF));
+  //TODO modify energy budget
 	if (worst_case_energy > energy_budget) {
 		PRINTF("Comp: Event not schedulable!\r\n");
 	}
@@ -203,4 +204,6 @@ uint32_t get_charge_rate_worst()
 	}
 	return worst;
 }
+
+
 

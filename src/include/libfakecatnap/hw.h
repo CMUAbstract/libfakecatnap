@@ -6,7 +6,7 @@ void start_timer(uint16_t time);
 void init_comparator();
 
 uint16_t read_adc();
-uint16_t turn_on_read_adc(void);
+uint16_t turn_on_read_adc(uint16_t);
 
 
 extern __nv uint16_t event_threshold;

@@ -21,6 +21,8 @@ typedef struct evt_ {
   int16_t time_rdy;
   evt_valid_t valid;
   uint16_t period;
+  float V_final;
+  float V_min;
 } evt_t;
 
 #define EVENT(name) EVT_ ## name
@@ -30,9 +32,11 @@ typedef struct evt_ {
   { .evt = &func, \
     .vltg = 0, \
     .period = per, \
-    .burst_num = 1, \
+    .burst_num = 1, /*TODO switch back to 1*/\
     .time_rdy = per, \
     .valid = WAITING, \
+    .V_min = 2.013, \
+    .V_final = 2.215 \
   }
 
 int event_return();

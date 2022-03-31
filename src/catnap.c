@@ -9,10 +9,12 @@
 #include "comp.h"
 #include "scheduler.h"
 #include "checkpoint.h"
+#include "culpeo.h"
 #include <libcapybara/board.h>
 #include <libcapybara/power.h>
 #include <libmsp/periph.h>
 #include <libio/console.h>
+#include <float.h>
 
 #ifndef BIT_FLIP
 
@@ -22,6 +24,13 @@
 	P##port##OUT &= ~BIT##bit; \
 
 #endif
+
+#ifdef CATNAP_FEASIBILITY
+#define SCALER 100
+#else
+#define SCALER 1000
+#endif
+
 
 __nv evt_list_t all_events = {.events = {0}, .cur_event = MAX_EVENTS+1};
 __nv task_fifo_t all_tasks = {.tasks = {0}};
@@ -56,6 +65,7 @@ int main(void) {
   vfinal = 0;
   vstart = 0;//TODO should these be NV at all?
   // Run the whole shebang
+  PRINTF("Sched!\r\n");
   scheduler();
 
   return 0; // Should not get here!
@@ -64,14 +74,18 @@ int main(void) {
 void scheduler(void) {
   while(1) {
     LCFN_INTERRUPTS_DISABLE;
-    // Why are we entering the loop?
+    culpeo_V_t bucket_temp;
     switch (curctx->mode) {
       case EVENT:
-        vfinal = turn_on_read_adc();
+        #ifdef CATNAP_FEASIBILITY
+        vfinal = turn_on_read_adc(SCALER);
         calculate_energy_use(curctx->active_evt,vstart,vfinal);
-        PRINTF("event! %x\r\n",sizeof(unsigned));
-        /*TODO run feasibility*/
-        //TODO fis this setting, we need to account for event time
+        PRINTF("event! %u\r\n",vfinal);
+        #else
+        bucket_temp = calc_culpeo_bucket();
+        PRINTF("event! %u\r\n",bucket_temp);
+        #endif
+        //TODO fix this setting, we need to account for event time
         //ticks_waited = TA0R;
         break;
       case TASK:
@@ -101,7 +115,9 @@ void scheduler(void) {
       BIT_FLIP(1,1);
       BIT_FLIP(1,1);
       SET_LOWER_COMP(DEFAULT_MIN_THRES); //TODO may not need this on camaroptera
-      vstart = turn_on_read_adc();
+      #ifdef CATNAP_FEASIBILITY
+      vstart = turn_on_read_adc(SCALER);
+      #endif
       LCFN_INTERRUPTS_ENABLE;
       curctx = next;
       // Jump
@@ -118,8 +134,8 @@ void scheduler(void) {
     //PRINTF("To wait: %u\r\n",ticks_to_wait);
     start_timer(ticks_to_wait);
     // check if we're above
-    uint16_t temp = turn_on_read_adc();
-    //PRINTF("ADC: %u\r\n",temp);
+    uint16_t temp = turn_on_read_adc(SCALER);
+    //PRINTF("ADC: %u %u %u\r\n",temp,event_threshold,tasks_ok);
     BIT_FLIP(1,5);
     BIT_FLIP(1,5);
     BIT_FLIP(1,5);
@@ -137,7 +153,7 @@ void scheduler(void) {
         BIT_FLIP(1,4);
         BIT_FLIP(1,4);
         next->mode = TASK;
-        PRINTF("1mode:%u\r\n",curctx->mode);
+        //PRINTF("1mode:%u\r\n",curctx->mode);
         LCFN_INTERRUPTS_ENABLE;
         curctx = next;
         restore_vol(); // Jump to new task
@@ -153,7 +169,7 @@ void scheduler(void) {
         BIT_FLIP(1,4);
         BIT_FLIP(1,4);
         BIT_FLIP(1,4);
-        PRINTF("mode:%u\r\n",curctx->mode);
+        //PRINTF("mode:%u\r\n",curctx->mode);
         LCFN_INTERRUPTS_ENABLE;
         curctx = next;
         __asm__ volatile ( // volatile because output operands unused by C
@@ -163,22 +179,27 @@ void scheduler(void) {
         );
       }
     }
+    /*else {
+      PRINTF("nO TASK FOR YOU! %u\r\n",event_threshold);
+    }*/
     //}
     BIT_FLIP(1,1);
     BIT_FLIP(1,1);
     BIT_FLIP(1,1);
     // Grab starting voltage if we're sleeping
+    #ifdef CATNAP_FEASIBILITY
     if (curctx->mode != TASK) {
-      v_charge_start = turn_on_read_adc();
+      v_charge_start = turn_on_read_adc(SCALER);
       t_start = TA0R;//TODO is the timer running here?
     }
+    #endif
     // Else sleep to recharge
     SET_MAX_UPPER_COMP(); // Set interrupt when we're fully charged too
     // measure vcap
     // set compE interrupt/timer
     // sleep
     LCFN_INTERRUPTS_ENABLE;
-    //PRINTF("Sleeping for %u = %u",TA0CCR0,ticks_to_wait);
+    PRINTF("Sleeping for %u = %u",TA0CCR0,ticks_to_wait);
     __disable_interrupt();
     comp_e_flag = 1; // Flag to get us out
     BIT_FLIP(1,1);
@@ -196,8 +217,9 @@ void scheduler(void) {
     BIT_FLIP(1,1);
     BIT_FLIP(1,1);
     BIT_FLIP(1,1);
+    #ifdef CATNAP_FEASIBILITY
     if (curctx->mode != TASK) {
-      v_charge_end = turn_on_read_adc();
+      v_charge_end = turn_on_read_adc(SCALER);
       if (!comp_e_flag) {
         t_end = TA0R;//we were woken up by the comparator
       }
@@ -208,8 +230,9 @@ void scheduler(void) {
       t_end = 0;// this is ok because these vars are volatile
       t_start = 0;
     }
+    #endif
     __enable_interrupt();
-    PRINTF("Wake!\r\n");
+    //PRINTF("Wake!\r\n");
   }
 
   return; // Should not get here
@@ -244,7 +267,7 @@ void COMP_VBANK_ISR (void) {
           break;
         }
         case TASK:{
-          PRINTF("Chkpt!\r\n");
+          //PRINTF("Chkpt!\r\n");
           checkpoint();
           chkpt_flag = 1;
           if (chkpt_flag) {
@@ -274,7 +297,7 @@ void COMP_VBANK_ISR (void) {
       }
       volatile int chkpt_flag;
       chkpt_flag = 0;
-      PRINTF("Chkpt2!\r\n");
+      //PRINTF("Chkpt2!\r\n");
       checkpoint();
       chkpt_flag = 1;
       // Jump to scheduler
@@ -290,7 +313,7 @@ void COMP_VBANK_ISR (void) {
         );
       }
       else {
-        PRINTF("Ret2\r\n");
+        //PRINTF("Ret2\r\n");
       }
     }
   }
@@ -301,7 +324,7 @@ void COMP_VBANK_ISR (void) {
     BIT_FLIP(1,4);
     BIT_FLIP(1,4);
     // SWitch to worrying about the minimum
-    PRINTF("Set min! %x\r\n",LEVEL_MASK & CECTL2);
+    //PRINTF("Set min! %x\r\n",LEVEL_MASK & CECTL2);
     SET_LOWER_COMP(DEFAULT_MIN_THRES);
     ticks_waited = TA0R;
     __bic_SR_register_on_exit(LPM3_bits); //wake up
@@ -320,7 +343,7 @@ timerISRHandler(void) {
 	TA0CCTL0 &= ~(CCIFG | CCIE); // Clear flag and stop int
 	//TA0CCTL0 &= ~(CCIFG); // Clear flag and stop int
 	CEINT &= ~CEIE; // Disable comp interrupt for our sanity
-  PRINTF("Timer %u\r\n",curctx->mode);
+  //PRINTF("Timer %u\r\n",curctx->mode);
 /*--------------------------------------------------------*/
   BIT_FLIP(1,5);
   BIT_FLIP(1,5);
@@ -334,7 +357,7 @@ timerISRHandler(void) {
   if ( curctx->mode == TASK) {
     volatile int chkpt_flag = 0;
     BIT_FLIP(1,5);
-    PRINTF("Chkpt3! %u\r\n",curctx->active_task->valid_chkpt);
+    //PRINTF("Chkpt3! %u\r\n",curctx->active_task->valid_chkpt);
     checkpoint();
     chkpt_flag = 1;
     // Jump to scheduler
@@ -345,7 +368,7 @@ timerISRHandler(void) {
           : [nt] "r" (&scheduler)
       );
     }
-    PRINTF("Ret3\r\n");
+    //PRINTF("Ret3\r\n");
     return;
   }
   BIT_FLIP(1,5);

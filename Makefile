@@ -8,12 +8,21 @@ OBJECTS += \
   checkpoint.o \
   hw.o \
   comp.o \
-  scheduler.o
+  scheduler.o \
+  culpeo.o
 
 DEPS += libcapybara:gcc
 
+export CATNAP_FEASIBILITY = 0
+
+
 # 2.0V, (2.0*100) and our alg takes care of it
+ifeq ($(CATNAP_FEASIBILITY),0)
+LIBFCN_EVENT_THRESHOLD = 2000
+else
+override CFLAGS += -DCATNAP_FEASIBILITY
 LIBFCN_EVENT_THRESHOLD = 200
+endif
 LIBFCN_COMP_PIN_PORT = 3
 LIBFCN_COMP_PIN_PIN = 1
 
