@@ -39,6 +39,8 @@ extern __nv volatile unsigned max_thres;
 extern const energy_t level_to_E[NUM_LEVEL];
 
 //	lower_thres = level;
+#ifndef LFCN_CONT_POWER
+
 #define SET_LOWER_COMP(val)\
 	CECTL0 = CEIMEN | CEIMSEL_13;\
 	CECTL2 = CEREFL_0;\
@@ -82,6 +84,19 @@ extern const energy_t level_to_E[NUM_LEVEL];
     CEINT |= CEIFG;\
   }\
   CEINT &= ~(CEIE | CEIIE);
+
+#error WTF
+
+#else//CONT_POWER
+
+#define SET_LOWER_COMP(val)
+
+#define SET_UPPER_COMP(val)
+
+#define SET_MAX_UPPER_COMP()
+
+#endif//CONT_POWER
+
 
 #if 1
 enum voltage {

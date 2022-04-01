@@ -11,7 +11,8 @@ int add_event(evt_t *event) {
   // event array.
   for (int i = 0; i < MAX_EVENTS; i++) {
     if (all_events.events[i] == event){
-      //  Event is already present
+      //  Event is already present, set it to ready
+      event->valid = WAITING;
       return 1;
     }
   }

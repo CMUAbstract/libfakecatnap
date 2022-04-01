@@ -17,6 +17,7 @@ extern uint16_t t_end;
 
 
 #ifndef GDB_INT_CFG
+
 #define DISABLE_LFCN_TIMER TA0CCTL0 &= ~CCIE;
 #define ENABLE_LFCN_TIMER TA0CCTL0 |= CCIE;
 
@@ -24,10 +25,20 @@ extern uint16_t t_end;
   TA0CCTL0 &= ~CCIE; \
 	CEINT &= ~(CEIE | CEIIE);
 
+#ifndef LFCN_CONT_POWER
 #define LCFN_INTERRUPTS_ENABLE \
   TA0CCTL0 |= CCIE; \
 	CEINT |= (CEIE | CEIIE);
-  
+
+#error WTF
+
+#else//CONT_POWER
+
+#define LCFN_INTERRUPTS_ENABLE \
+  TA0CCTL0 |= CCIE; \
+
+#endif//CONT_POWER
+
 #else
 
 #define DISABLE_LFCN_TIMER P1IE &= ~BIT0;
@@ -37,7 +48,7 @@ extern uint16_t t_end;
   P1IE &= ~BIT0;\
 	CEINT = ~(CEIE | CEIIE);
 
-#endif
+#endif//INT
 
 #define ADC_ENABLE \
 do { \

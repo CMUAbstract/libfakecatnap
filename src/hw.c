@@ -44,7 +44,9 @@ void init_comparator() {
 	while (!CERDYIFG);
 	// clear int flag and enable int
 	CEINT &= ~(CEIFG | CEIIFG);
+#ifndef LFCN_CONT_POWER
 	CEINT |= CEIE;
+#endif
 }
 
 

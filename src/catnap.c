@@ -2,19 +2,27 @@
 // boot behavior, scheduler, timer and comparator interrupts all live here
 #include <stdio.h>
 #include <msp430.h>
-#include "catnap.h"
-#include "tasks.h"
-#include "events.h"
-#include "hw.h"
-#include "comp.h"
-#include "scheduler.h"
-#include "checkpoint.h"
-#include "culpeo.h"
 #include <libcapybara/board.h>
 #include <libcapybara/power.h>
 #include <libmsp/periph.h>
 #include <libio/console.h>
 #include <float.h>
+#include "catnap.h"
+#include "checkpoint.h"
+#include "culpeo.h"
+#include "scheduler.h"
+#include "events.h"
+#include "tasks.h"
+#include "hw.h"
+#include "comp.h"
+
+//#define LFCN_DBG
+
+#ifdef LFCN_DBG
+  #define LFCN_DBG_PRINTF PRINTF
+#else
+  #define LFCN_DBG_PRINTF(...)
+#endif
 
 #ifndef BIT_FLIP
 
@@ -24,6 +32,7 @@
 	P##port##OUT &= ~BIT##bit; \
 
 #endif
+
 
 #ifdef CATNAP_FEASIBILITY
 #define SCALER 100
@@ -65,7 +74,6 @@ int main(void) {
   vfinal = 0;
   vstart = 0;//TODO should these be NV at all?
   // Run the whole shebang
-  PRINTF("Sched!\r\n");
   scheduler();
 
   return 0; // Should not get here!
@@ -80,7 +88,7 @@ void scheduler(void) {
         #ifdef CATNAP_FEASIBILITY
         vfinal = turn_on_read_adc(SCALER);
         calculate_energy_use(curctx->active_evt,vstart,vfinal);
-        PRINTF("event! %u\r\n",vfinal);
+        PRINTF("event! %u %u\r\n",curctx->active_evt->valid,TA0R);
         #else
         bucket_temp = calc_culpeo_bucket();
         PRINTF("event! %u\r\n",bucket_temp);
@@ -98,12 +106,13 @@ void scheduler(void) {
     // Update feasibility, etc
     //PRINTF("ticks:%u\r\n",ticks_waited);
     update_event_timers(ticks_waited);
+    ticks_waited = 0;
     // Schedule something next
     evt_t * nextE = pick_event();
     BIT_FLIP(1,1);
     // If event, measure vcap
     if (nextE != NULL) {
-      //PRINTF("NEXTE\r\n");
+      LFCN_DBG_PRINTF("NEXTE\r\n");
       //__delay_cycles(80000); //TODO remove
       // Swap context
       context_t *next = (curctx == &context_0 )? &context_1 : &context_0;
@@ -111,7 +120,7 @@ void scheduler(void) {
       next->active_evt = nextE;
       next->mode = EVENT;
       // enable the absolute lowest threshold so we power off if there's a failure
-      //PRINTF("Set low thresh %x\r\n",nextE);
+      LFCN_DBG_PRINTF("Set low thresh %x\r\n",nextE);
       BIT_FLIP(1,1);
       BIT_FLIP(1,1);
       SET_LOWER_COMP(DEFAULT_MIN_THRES); //TODO may not need this on camaroptera
@@ -120,6 +129,7 @@ void scheduler(void) {
       #endif
       LCFN_INTERRUPTS_ENABLE;
       curctx = next;
+      LFCN_DBG_PRINTF("Jump!\r\n");
       // Jump
       __asm__ volatile ( // volatile because output operands unused by C
           "br %[nt]\n"
@@ -127,20 +137,24 @@ void scheduler(void) {
           : [nt] "r" (curctx->active_evt->evt)
       );
     }
-    //PRINTF("Pick task?\r\n");
+    LFCN_DBG_PRINTF("Pick task? %u\r\n",tasks_ok);
     //else { TODO can we actually leave this out?
       // First set up timers to wait for an event
     ticks_to_wait = get_next_evt_time();
-    //PRINTF("To wait: %u\r\n",ticks_to_wait);
+    //LFCN_DBG_PRINTF("To wait: %u\r\n",ticks_to_wait);
     start_timer(ticks_to_wait);
     // check if we're above
+    #ifndef LFCN_CONT_POWER
     uint16_t temp = turn_on_read_adc(SCALER);
-    //PRINTF("ADC: %u %u %u\r\n",temp,event_threshold,tasks_ok);
+    #else
+    uint16_t temp = LFCN_STARTER_THRESH + 10;
+    #endif
+    //LFCN_DBG_PRINTF("ADC: %u %u %u\r\n",temp,event_threshold,tasks_ok);
     BIT_FLIP(1,5);
     BIT_FLIP(1,5);
     BIT_FLIP(1,5);
     if (temp > event_threshold && tasks_ok) { // Only pick a task if we're above the thresh
-      //PRINTF("Set thresh %u, tasks ok: %u\r\n",event_threshold,tasks_ok);
+      LFCN_DBG_PRINTF("Set thresh %u, tasks ok: %u\r\n",event_threshold,tasks_ok);
       SET_LOWER_COMP(DEFAULT_LOWER_THRES); // Interrupt if we got below event thresh
       // Check if there's an active task, and jump to it if there is
       //PRINTF("chkpt: %u,active task? %x, \r\n",curctx->active_task->valid_chkpt,curctx->active_task);
@@ -153,7 +167,7 @@ void scheduler(void) {
         BIT_FLIP(1,4);
         BIT_FLIP(1,4);
         next->mode = TASK;
-        //PRINTF("1mode:%u\r\n",curctx->mode);
+        //LFCN_DBG_PRINTF("1mode:%u\r\n",curctx->mode);
         LCFN_INTERRUPTS_ENABLE;
         curctx = next;
         restore_vol(); // Jump to new task
@@ -169,7 +183,7 @@ void scheduler(void) {
         BIT_FLIP(1,4);
         BIT_FLIP(1,4);
         BIT_FLIP(1,4);
-        //PRINTF("mode:%u\r\n",curctx->mode);
+        //LFCN_DBG_PRINTF("mode:%u\r\n",curctx->mode);
         LCFN_INTERRUPTS_ENABLE;
         curctx = next;
         __asm__ volatile ( // volatile because output operands unused by C
@@ -199,7 +213,7 @@ void scheduler(void) {
     // set compE interrupt/timer
     // sleep
     LCFN_INTERRUPTS_ENABLE;
-    PRINTF("Sleeping for %u = %u",TA0CCR0,ticks_to_wait);
+    LFCN_DBG_PRINTF("Sleeping for %u = %u",TA0CCR0,ticks_to_wait);
     __disable_interrupt();
     comp_e_flag = 1; // Flag to get us out
     BIT_FLIP(1,1);
@@ -208,10 +222,12 @@ void scheduler(void) {
     BIT_FLIP(1,1);
     BIT_FLIP(1,1);
     BIT_FLIP(1,1);
-    while((TA0CCTL0 & CCIE) && comp_e_flag) { //TODO expand so we can get out with compE
+    while((TA0CCTL0 & CCIE) && comp_e_flag) {
       __bis_SR_register(LPM3_bits + GIE);
+      LFCN_DBG_PRINTF("Woo!\r\n");
       __disable_interrupt();
     }
+    LFCN_DBG_PRINTF("Done?");
     BIT_FLIP(1,1);
     BIT_FLIP(1,1);
     BIT_FLIP(1,1);
@@ -232,7 +248,7 @@ void scheduler(void) {
     }
     #endif
     __enable_interrupt();
-    //PRINTF("Wake!\r\n");
+    //LFCN_DBG_PRINTF("Wake!\r\n");
   }
 
   return; // Should not get here
@@ -242,18 +258,17 @@ void scheduler(void) {
 
 __attribute__ ((interrupt(COMP_E_VECTOR)))
 void COMP_VBANK_ISR (void) {
-  //PRINTF("in comp\r\n");
   COMP_VBANK(INT) &= ~COMP_VBANK(IE);
   //COMP_VBANK(CTL1) &= ~COMP_VBANK(ON);
   DISABLE_LFCN_TIMER;// Just in case
   BIT_FLIP(1,4);
   BIT_FLIP(1,4);
-  //PRINTF("comp\r\n");
+  PRINTF("in comp\r\n");
   volatile int chkpt_flag = 0;
   if (!(CECTL2 & CERSEL)) {
-  //PRINTF("comp3\r\n");
+  //LFCN_DBG_PRINTF("comp3\r\n");
     if ((LEVEL_MASK & CECTL2) == level_to_reg[DEFAULT_MIN_THRES]) {
-      //PRINTF("comp4\r\n");
+      //LFCN_DBG_PRINTF("comp4\r\n");
       switch (curctx->mode) {
         case CHARGING:
         case EVENT:
@@ -267,7 +282,7 @@ void COMP_VBANK_ISR (void) {
           break;
         }
         case TASK:{
-          //PRINTF("Chkpt!\r\n");
+          //LFCN_DBG_PRINTF("Chkpt!\r\n");
           checkpoint();
           chkpt_flag = 1;
           if (chkpt_flag) {
@@ -290,14 +305,14 @@ void COMP_VBANK_ISR (void) {
       }
     }
     else { /* We hit the event bucket threshold*/ /* Stop task, jump back to scheduler so we start charging*/
-    //PRINTF("comp2 %x\r\n",CECTL2);
+    //LFCN_DBG_PRINTF("comp2 %x\r\n",CECTL2);
       tasks_ok = 0;
       if (curctx->mode != TASK) {
         return; // If we're not in a task just return w/out a checkpoint
       }
       volatile int chkpt_flag;
       chkpt_flag = 0;
-      //PRINTF("Chkpt2!\r\n");
+      LFCN_DBG_PRINTF("Chkpt2!\r\n");
       checkpoint();
       chkpt_flag = 1;
       // Jump to scheduler
@@ -313,7 +328,7 @@ void COMP_VBANK_ISR (void) {
         );
       }
       else {
-        //PRINTF("Ret2\r\n");
+        LFCN_DBG_PRINTF("Ret2\r\n");
       }
     }
   }
@@ -324,7 +339,7 @@ void COMP_VBANK_ISR (void) {
     BIT_FLIP(1,4);
     BIT_FLIP(1,4);
     // SWitch to worrying about the minimum
-    //PRINTF("Set min! %x\r\n",LEVEL_MASK & CECTL2);
+    //LFCN_DBG_PRINTF("Set min! %x\r\n",LEVEL_MASK & CECTL2);
     SET_LOWER_COMP(DEFAULT_MIN_THRES);
     ticks_waited = TA0R;
     __bic_SR_register_on_exit(LPM3_bits); //wake up
@@ -343,21 +358,21 @@ timerISRHandler(void) {
 	TA0CCTL0 &= ~(CCIFG | CCIE); // Clear flag and stop int
 	//TA0CCTL0 &= ~(CCIFG); // Clear flag and stop int
 	CEINT &= ~CEIE; // Disable comp interrupt for our sanity
-  //PRINTF("Timer %u\r\n",curctx->mode);
+  //LFCN_DBG_PRINTF("Timer %u\r\n",curctx->mode);
 /*--------------------------------------------------------*/
   BIT_FLIP(1,5);
   BIT_FLIP(1,5);
   BIT_FLIP(1,5);
   BIT_FLIP(1,5);
-  //PRINTF("timera0\r\n");
   // Record wait time
   ticks_waited = ticks_to_wait;
   TA0R = 0; // Not sure if we need this
   // If we're in a task, checkpoint it and move on
+  PRINTF("timera0 %u\r\n",(TA0CCTL0 & CCIE));
   if ( curctx->mode == TASK) {
+    LFCN_DBG_PRINTF("Chkpt3! %u\r\n",curctx->active_task->valid_chkpt);
     volatile int chkpt_flag = 0;
     BIT_FLIP(1,5);
-    //PRINTF("Chkpt3! %u\r\n",curctx->active_task->valid_chkpt);
     checkpoint();
     chkpt_flag = 1;
     // Jump to scheduler
@@ -368,13 +383,15 @@ timerISRHandler(void) {
           : [nt] "r" (&scheduler)
       );
     }
-    //PRINTF("Ret3\r\n");
+    LFCN_DBG_PRINTF("Ret3\r\n");
     return;
   }
   BIT_FLIP(1,5);
   __bic_SR_register_on_exit(LPM3_bits); //wake up
 /*--------------------------------------------------------*/
+#ifndef LFCN_CONT_POWER
 	CEINT |= CEIE; // Re-enable checkpoint interrupt
+#endif
   //TA0CCTL0 |= CCIE; // Re-enable timer int.
 }
 #else

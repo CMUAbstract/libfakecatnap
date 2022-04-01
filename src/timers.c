@@ -34,6 +34,7 @@ void update_event_timers(uint16_t ticks) {
       }
       // Set ready bits
       if (buffer.time_rdy <= 0) {
+        PRINTF("Rdy %u! %x\r\n",timer_i,temp_event);
         buffer.valid = RDY;
       }
       buffer_done = 1;
