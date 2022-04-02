@@ -30,8 +30,6 @@ extern uint16_t t_end;
   TA0CCTL0 |= CCIE; \
 	CEINT |= (CEIE | CEIIE);
 
-#error WTF
-
 #else//CONT_POWER
 
 #define LCFN_INTERRUPTS_ENABLE \

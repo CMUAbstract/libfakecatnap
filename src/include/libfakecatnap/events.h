@@ -1,6 +1,5 @@
 #ifndef _LIBFAKECATNAP_EVENTS_H_
 #define _LIBFAKECATNAP_EVENTS_H_
-
 typedef enum evt_valid_ {
   OFF,
   WAITING,
@@ -28,15 +27,15 @@ typedef struct evt_ {
 #define EVENT(name) EVT_ ## name
 
 #define DEC_EVT(name, func, per)\
-  evt_t EVT_ ## name  =  \
+  __nv evt_t EVT_ ## name  =  \
   { .evt = &func, \
     .vltg = 0, \
     .period = per, \
     .burst_num = 1, /*TODO switch back to 1*/\
     .time_rdy = per, \
     .valid = WAITING, \
-    .V_min = 2.013, \
-    .V_final = 2.215 \
+    .V_min = 0, \
+    .V_final = 0 \
   }
 
 int event_return();

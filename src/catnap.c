@@ -40,7 +40,9 @@
 #define SCALER 1000
 #endif
 
+#define MAGIC_NUMBER 0xab03
 
+__nv uint16_t first_boot = 0;
 __nv evt_list_t all_events = {.events = {0}, .cur_event = MAX_EVENTS+1};
 __nv task_fifo_t all_tasks = {.tasks = {0}};
 
@@ -52,24 +54,29 @@ __nv volatile context_t *curctx = &context_0;
 __nv uint8_t comp_e_flag = 1;
 volatile __nv uint8_t tasks_ok = 1;
 
+__nv uint8_t fail_count = 0;
+
+
 // Main function to handle boot and kick us off
 int main(void) {
   // Init capy
   capybara_init(); // TODO may want to slim down
   PRINTF("Boot\r\n");
+  fail_count++;
+  app_hw_init();
   // Init timer
-  //__delay_cycles(800000); //TODO take out
-  //tasks_ok = 0;
   ENABLE_LFCN_TIMER;
   // Init comparator
   init_comparator();
-  //PRINTF("start %x\r\n",CECTL2);
-
-  P3SEL1 |= BIT5;
+  // Code to make 3.5 COUT--> remove all BIT_FLIPS(3,5) to run this
+  /*P3SEL1 |= BIT5;
   P3SEL0 &= ~(BIT5);
-  P3DIR |= BIT5;
+  P3DIR |= BIT5;*/
   // on very first boot, pull in starter event
-  add_event(&EVT_FCN_STARTER);
+  if (first_boot != MAGIC_NUMBER) {
+    add_event(&EVT_FCN_STARTER);
+    first_boot = MAGIC_NUMBER;
+  }
   // Clear a couple variables after a reboot
   vfinal = 0;
   vstart = 0;//TODO should these be NV at all?
@@ -88,10 +95,16 @@ void scheduler(void) {
         #ifdef CATNAP_FEASIBILITY
         vfinal = turn_on_read_adc(SCALER);
         calculate_energy_use(curctx->active_evt,vstart,vfinal);
-        PRINTF("event! %u %u\r\n",curctx->active_evt->valid,TA0R);
+        PRINTF("event! ");
+        print_float(curctx->active_evt->V_final);
+        print_float(curctx->active_evt->V_min);
+        PRINTF("\r\n");
         #else
-        bucket_temp = calc_culpeo_bucket();
-        PRINTF("event! %u\r\n",bucket_temp);
+        bucket_temp = calc_culpeo_bucket();//TODO only run on changes
+        PRINTF("event! ");
+        print_float(curctx->active_evt->V_final);
+        print_float(curctx->active_evt->V_min);
+        PRINTF("\r\n");
         #endif
         //TODO fix this setting, we need to account for event time
         //ticks_waited = TA0R;
@@ -103,17 +116,31 @@ void scheduler(void) {
         curctx->mode = CHARGING;
         break;
     }
+    //dump_events();
     // Update feasibility, etc
     //PRINTF("ticks:%u\r\n",ticks_waited);
     update_event_timers(ticks_waited);
     ticks_waited = 0;
     // Schedule something next
     evt_t * nextE = pick_event();
+      /*PRINTF("post pick %x ",curctx->active_evt);
+      print_float(curctx->active_evt->V_final);
+      print_float(curctx->active_evt->V_min);
+      PRINTF("\r\n");*/
     BIT_FLIP(1,1);
     // If event, measure vcap
     if (nextE != NULL) {
       LFCN_DBG_PRINTF("NEXTE\r\n");
-      //__delay_cycles(80000); //TODO remove
+      // Profile if needed
+      //TODO make this smarter so we can re-profile easily
+      #ifndef CATNAP_FEASIBILITY
+      // Culpeo profiling
+      if (nextE->V_final == 0 || nextE->V_min == 0) {
+        profile_event(nextE);
+        PRINTF("Should not be here!!!\r\n");
+        //DOES NOT RETURN
+      }
+      #endif
       // Swap context
       context_t *next = (curctx == &context_0 )? &context_1 : &context_0;
       next->active_task = curctx->active_task;
@@ -168,6 +195,7 @@ void scheduler(void) {
         BIT_FLIP(1,4);
         next->mode = TASK;
         //LFCN_DBG_PRINTF("1mode:%u\r\n",curctx->mode);
+        PRINTF("1mode:%u\r\n",curctx->mode);
         LCFN_INTERRUPTS_ENABLE;
         curctx = next;
         restore_vol(); // Jump to new task

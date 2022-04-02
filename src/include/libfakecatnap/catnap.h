@@ -9,6 +9,12 @@
 #include "tasks.h"
 
 
+#define BIT_FLIP(port,bit) \
+	P##port##OUT |= BIT##bit; \
+	P##port##DIR |= BIT##bit; \
+	P##port##OUT &= ~BIT##bit; \
+
+
 
 typedef enum activity_ {
   CHARGING,
@@ -49,10 +55,14 @@ extern __nv volatile context_t *curctx;
 extern __nv volatile fifo_meta_t fifo_0;
 extern __nv volatile fifo_meta_t fifo_1;
 
+extern __nv volatile context_t context_0;
+extern __nv volatile context_t context_1;
+
 // Operations on arrays of events
 int add_event(evt_t *);
 int dec_event(evt_t *);
 evt_t * pick_event(void);
+void dump_events();
 
 int push_task(task_t *);
 task_t * pop_task(void);
@@ -80,6 +90,7 @@ extern __nv task_fifo_t all_tasks;
 extern volatile  __nv uint16_t ticks_waited;
 extern volatile uint16_t ticks_to_wait;
 
+void app_hw_init(void);
 
 int main(void);
 void scheduler(void);

@@ -1,7 +1,10 @@
 #ifndef _LCFN_CULPEO_H_
 #define _LCFN_CULPEO_H_
+
 extern __nv float Vmin;
 extern __nv float Vfinal;
+
+extern volatile uint8_t culpeo_profiling_flag;
 
 void print_float(float f);
 

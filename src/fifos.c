@@ -1,6 +1,7 @@
 #include "catnap.h"
 #include <stdio.h>
 #include <libio/console.h>
+#include "culpeo.h"
 
 __nv volatile fifo_meta_t fifo_0 = {0,0,0};
 __nv volatile fifo_meta_t fifo_1 = {0,0,0};
@@ -18,6 +19,7 @@ int add_event(evt_t *event) {
   }
   for (int i = 0; i < MAX_EVENTS; i++) {
     if (all_events.events[i] == 0) {
+      PRINTF("New evt!\r\n");
       all_events.events[i] = event;
       break;
     }
@@ -45,6 +47,20 @@ evt_t * pick_event() {
   return NULL;
 }
 
+void dump_events() {
+  PRINTF("Event dump:\r\n");
+  for (int i = 0; i < MAX_EVENTS; i++) {
+    if (all_events.events[i] == 0) {
+      continue;
+    }
+    PRINTF("%x ",all_events.events[i]);
+    print_float(all_events.events[i]->V_min);
+    print_float(all_events.events[i]->V_final);
+    PRINTF("\r\n");
+  }
+  PRINTF("\r\n");
+  return;
+}
 
 
 // Push task on global task fifo
@@ -64,6 +80,7 @@ int push_task(task_t *task) {
   }
   next_fifo->tsk_cnt = curctx->fifo->tsk_cnt + 1;
   curctx->fifo = next_fifo;
+  PRINTF("task slotted\r\n");
   return 0;
 }
 
