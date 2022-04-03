@@ -7,6 +7,12 @@ typedef enum evt_valid_ {
   DONE
 } evt_valid_t;
 
+typedef enum periodicity_ {
+  PERIODIC,
+  SPORADIC,
+  BURSTY
+} periodicity_t;
+
 typedef void (evt_func_t)(void);
 
 typedef struct evt_ {
@@ -20,17 +26,19 @@ typedef struct evt_ {
   int16_t time_rdy;
   evt_valid_t valid;
   uint16_t period;
+  uint8_t periodic;
   float V_final;
   float V_min;
 } evt_t;
 
 #define EVENT(name) EVT_ ## name
 
-#define DEC_EVT(name, func, per)\
+#define DEC_EVT(name, func, per,periodicity)\
   __nv evt_t EVT_ ## name  =  \
   { .evt = &func, \
     .vltg = 0, \
     .period = per, \
+    .periodic = periodicity, \
     .burst_num = 1, /*TODO switch back to 1*/\
     .time_rdy = per, \
     .valid = WAITING, \

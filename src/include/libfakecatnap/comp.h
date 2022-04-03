@@ -16,7 +16,7 @@
 // This represents energy in 1.31V - 1.08V
 #define E_OPERATING 3*E_QUANTA 
 
-#define DEFAULT_LOWER_THRES V_2_00
+#define DEFAULT_LOWER_THRES V_2_30
 #define DEFAULT_MIN_THRES V_1_54
 #define DEFAULT_UPPER_THRES V_2_44
 #define DEFAULT_NEARLY_MAX_THRES V_2_44

@@ -62,8 +62,8 @@ unsigned calculate_charge_rate(uint16_t t_charge_end, uint16_t t_charge_start)
 	unsigned rate_changed = 0;
 	uint32_t charge_rate;
 
-	//PRINTF("Chrg: vs: %u, ve: %u\r\n", v_charge_start, v_charge_end);
-	//PRINTF("Chrg: Ts: %u, Te: %u\r\n", t_charge_start, t_charge_end);
+	PRINTF("Chrg: vs: %u, ve: %u\r\n", v_charge_start, v_charge_end);
+	PRINTF("Chrg: Ts: %u, Te: %u\r\n", t_charge_start, t_charge_end);
   //PRINTF("IT:%u %u \r\n",cr_window_it, cr_window_ready);
 	if (!v_charge_start) {
 		goto calculate_charge_rate_cleanup;
@@ -118,7 +118,7 @@ unsigned calculate_charge_rate(uint16_t t_charge_end, uint16_t t_charge_start)
 
 	//uint32_t avg_charge_rate = get_charge_rate_average();
 	uint32_t worst_charge_rate = get_charge_rate_worst();
-  //PRINTF("Charge rate: %u\r\n",worst_charge_rate);
+  // PRINTF("Charge rate: %u\r\n",worst_charge_rate);
 	//PRINTF("cr: %u %u\r\n", (unsigned)(worst_charge_rate >> 16), (unsigned)(worst_charge_rate & 0xFFFF));
 
 	// Change mode if necessary
@@ -129,6 +129,7 @@ unsigned calculate_charge_rate(uint16_t t_charge_end, uint16_t t_charge_start)
 	unsigned schedulable = is_schedulable(worst_charge_rate);
 	while (!schedulable) {
     PRINTF("Not schedulable!\r\n");
+    while(1);
 	}
 
 calculate_charge_rate_cleanup:
@@ -156,7 +157,8 @@ unsigned is_schedulable(uint32_t charge_rate)
 		tmp = event->charge_time * event->burst_num;
 		tmp *= U_AMP_FACTOR; // Amplify
 		tmp /= (uint32_t)event->period;
-		//PRINTF("charge time: %u T: %u\r\n", (unsigned)event->charge_time, event->get_period());
+    PRINTF("charge time: %u T: %u\r\n", (unsigned)event->charge_time,
+    event->period);
 		U += tmp;
 	}
 	PRINTF("U: %x %x\r\n", (unsigned)(U >> 16), (unsigned)(U & 0xFFFF));

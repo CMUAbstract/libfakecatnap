@@ -76,6 +76,7 @@ int main(void) {
   if (first_boot != MAGIC_NUMBER) {
     add_event(&EVT_FCN_STARTER);
     first_boot = MAGIC_NUMBER;
+    capybara_shutdown();
   }
   // Clear a couple variables after a reboot
   vfinal = 0;
@@ -95,10 +96,7 @@ void scheduler(void) {
         #ifdef CATNAP_FEASIBILITY
         vfinal = turn_on_read_adc(SCALER);
         calculate_energy_use(curctx->active_evt,vstart,vfinal);
-        PRINTF("event! ");
-        print_float(curctx->active_evt->V_final);
-        print_float(curctx->active_evt->V_min);
-        PRINTF("\r\n");
+        PRINTF("event! %u %u\r\n",vstart,vfinal);
         #else
         bucket_temp = calc_culpeo_bucket();//TODO only run on changes
         PRINTF("event! ");
@@ -112,7 +110,8 @@ void scheduler(void) {
       case TASK:
       case SLEEPING:
       case CHARGING:
-        PRINTF("not event! %x\r\n",tasks_ok);
+        PRINTF("not event! %x\r\n",curctx->active_task);
+        PRINTF("\tnot event! %x\r\n",ticks_waited);
         curctx->mode = CHARGING;
         break;
     }
@@ -165,8 +164,7 @@ void scheduler(void) {
       );
     }
     LFCN_DBG_PRINTF("Pick task? %u\r\n",tasks_ok);
-    //else { TODO can we actually leave this out?
-      // First set up timers to wait for an event
+    // First set up timers to wait for an event
     ticks_to_wait = get_next_evt_time();
     //LFCN_DBG_PRINTF("To wait: %u\r\n",ticks_to_wait);
     start_timer(ticks_to_wait);
@@ -221,10 +219,8 @@ void scheduler(void) {
         );
       }
     }
-    /*else {
-      PRINTF("nO TASK FOR YOU! %u\r\n",event_threshold);
-    }*/
-    //}
+    // Got to sleep
+    curctx->mode = SLEEPING;
     BIT_FLIP(1,1);
     BIT_FLIP(1,1);
     BIT_FLIP(1,1);
@@ -233,6 +229,7 @@ void scheduler(void) {
     if (curctx->mode != TASK) {
       v_charge_start = turn_on_read_adc(SCALER);
       t_start = TA0R;//TODO is the timer running here?
+      BIT_FLIP(3,5);
     }
     #endif
     // Else sleep to recharge
@@ -241,7 +238,7 @@ void scheduler(void) {
     // set compE interrupt/timer
     // sleep
     LCFN_INTERRUPTS_ENABLE;
-    LFCN_DBG_PRINTF("Sleeping for %u = %u",TA0CCR0,ticks_to_wait);
+    //LFCN_DBG_PRINTF("Sleeping for %u = %u",TA0CCR0,ticks_to_wait);
     __disable_interrupt();
     comp_e_flag = 1; // Flag to get us out
     BIT_FLIP(1,1);
@@ -252,10 +249,10 @@ void scheduler(void) {
     BIT_FLIP(1,1);
     while((TA0CCTL0 & CCIE) && comp_e_flag) {
       __bis_SR_register(LPM3_bits + GIE);
-      LFCN_DBG_PRINTF("Woo!\r\n");
+      //LFCN_DBG_PRINTF("Woo!\r\n");
       __disable_interrupt();
     }
-    LFCN_DBG_PRINTF("Done?");
+    //LFCN_DBG_PRINTF("Done?");
     BIT_FLIP(1,1);
     BIT_FLIP(1,1);
     BIT_FLIP(1,1);
@@ -270,7 +267,10 @@ void scheduler(void) {
       else {
         t_end = ticks_waited - t_start; //woken up by timer which clobbered ta0r
       }
+      BIT_FLIP(3,5);
+      BIT_FLIP(3,5);
       calculate_charge_rate(t_end,t_start);
+      //PRINTF("Got t_end!\r\n");
       t_end = 0;// this is ok because these vars are volatile
       t_start = 0;
     }
@@ -291,7 +291,7 @@ void COMP_VBANK_ISR (void) {
   DISABLE_LFCN_TIMER;// Just in case
   BIT_FLIP(1,4);
   BIT_FLIP(1,4);
-  PRINTF("in comp\r\n");
+  //PRINTF("in comp\r\n");
   volatile int chkpt_flag = 0;
   if (!(CECTL2 & CERSEL)) {
   //LFCN_DBG_PRINTF("comp3\r\n");
@@ -319,7 +319,7 @@ void COMP_VBANK_ISR (void) {
             BIT_FLIP(1,0);
             BIT_FLIP(1,0);
             curctx->mode = CHARGING;
-            capybara_shutdown();
+            //capybara_shutdown();
           }
           else {
             curctx->mode = TASK;
@@ -396,7 +396,7 @@ timerISRHandler(void) {
   ticks_waited = ticks_to_wait;
   TA0R = 0; // Not sure if we need this
   // If we're in a task, checkpoint it and move on
-  PRINTF("timera0 %u\r\n",(TA0CCTL0 & CCIE));
+  //PRINTF("timera0 %u\r\n",(TA0CCTL0 & CCIE));
   if ( curctx->mode == TASK) {
     LFCN_DBG_PRINTF("Chkpt3! %u\r\n",curctx->active_task->valid_chkpt);
     volatile int chkpt_flag = 0;

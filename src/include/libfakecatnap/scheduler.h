@@ -15,7 +15,7 @@ void update_comp();
 // uint16_t!
 
 //TODO set to a real values based on our adc, timer, etc
-#define V_THRES  2
+#define V_THRES  0
 #define CHARGE_TIME_THRES 100
 #define AMP_FACTOR  100
 #define U_AMP_FACTOR  100

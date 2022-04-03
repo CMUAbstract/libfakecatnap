@@ -12,8 +12,10 @@ __nv int buffer_done = 0;
 void update_event_timers(uint16_t ticks) {
   for (/*empty*/; timer_i < MAX_EVENTS; timer_i++) {
     if (buffer_done) { //failsafe if we don't finish copy
-      all_events.events[timer_i]->time_rdy = buffer.time_rdy;
-      all_events.events[timer_i]->valid = buffer.valid;
+      if (all_events.events[timer_i] != 0) {
+        all_events.events[timer_i]->time_rdy = buffer.time_rdy;
+        all_events.events[timer_i]->valid = buffer.valid;
+      }
       buffer_done = 0;
       continue;
     }
@@ -25,7 +27,12 @@ void update_event_timers(uint16_t ticks) {
       buffer.valid = temp_event->valid;
       // Reset finished events
       if (buffer.valid == DONE) {
-        buffer.time_rdy = temp_event->period;
+        if (temp_event->periodic == PERIODIC) {
+          buffer.time_rdy = temp_event->period;
+        }
+        else {
+          buffer.time_rdy = 0;
+        }
         buffer.valid = WAITING; // needs to be after time_rdy update
       }
       else {
@@ -53,6 +60,9 @@ uint16_t get_next_evt_time(void) {
   uint16_t min_time = 0x7fff;
   int16_t temp_time;
   for (int i = 0; i < MAX_EVENTS; i++) {
+    if (all_events.events[i] == 0) {
+      continue;
+    }
     if (all_events.events[i]->valid != WAITING) {
       continue;
     }

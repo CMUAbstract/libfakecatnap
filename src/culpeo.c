@@ -169,11 +169,7 @@ void culpeo_charging(){
     adc_reading = ADC12MEM0;          // Read ADC value
 
     ADC12CTL0 &= ~ADC12ENC;           // Disable ADC
-    BIT_FLIP(3,5);
     msp_sleep(10000);
-    BIT_FLIP(3,5);
-    BIT_FLIP(3,5);
-    BIT_FLIP(3,5);
     //__delay_cycles(80000);
     if (count > 2) {
       capybara_shutdown();
@@ -194,12 +190,6 @@ void culpeo_charging(){
     //burn
     __delay_cycles(8000);
   }
-    BIT_FLIP(3,5);
-    BIT_FLIP(3,5);
-    BIT_FLIP(3,5);
-    BIT_FLIP(3,5);
-    BIT_FLIP(3,5);
-    BIT_FLIP(3,5);
   adc_reading = 0;
 }
 
@@ -208,8 +198,6 @@ void culpeo_charging(){
 
 int profile_event(evt_t *ev) {
   //Disable other interrupts
-  BIT_FLIP(3,5);
-  BIT_FLIP(3,5);
   LCFN_INTERRUPTS_DISABLE;
   // Charge up to 2.4V
   culpeo_charging();
@@ -244,13 +232,12 @@ int profile_cleanup(evt_t *ev) {
   ev->V_final = (float)temp/800.0;
   culpeo_profiling_flag = 0;
   CULPEO_ADC_DISABLE;
-  BIT_FLIP(3,5);
-  BIT_FLIP(3,5);
 }
 
 void __attribute__((interrupt(TIMER1_A0_VECTOR)))
 timerA1ISRHandler(void) {
     uint16_t val;
+    //PRINTF("ms timer\r\n");
     TA1R = 0;
     val = read_adc();
     if (culpeo_min_reading > val) {
