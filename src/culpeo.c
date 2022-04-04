@@ -227,9 +227,12 @@ int profile_cleanup(evt_t *ev) {
   CULPEO_PROF_TIMER_DISABLE;
   // sleep
   __delay_cycles(800000);//100ms
-  ev->V_min = (float)culpeo_min_reading/800.0;
-  uint16_t temp = read_adc(); 
-  ev->V_final = (float)temp/800.0;
+  uint16_t temp = read_adc();  
+  Vmin = (float)culpeo_min_reading/800.0;
+  Vfinal = (float)temp/800.0;
+  ev->V_safe = calc_culpeo_vsafe();
+  ev->V_min = Vmin;
+  ev->V_final = Vfinal;
   culpeo_profiling_flag = 0;
   CULPEO_ADC_DISABLE;
 }
