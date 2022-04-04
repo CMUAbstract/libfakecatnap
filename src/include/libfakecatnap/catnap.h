@@ -75,10 +75,10 @@ uint16_t get_next_evt_time(void);
 #define STARTER_EVT(func) \
   __nv evt_t EVT_FCN_STARTER = {\
   .evt = &func, \
-  .vltg = 0, \
   .time_rdy = 0, \
   .valid = RDY, \
-  .period = 0 \
+  .period = 0, \
+  .burst_num = 0\
   }
 
 extern evt_t EVT_FCN_STARTER;

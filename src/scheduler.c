@@ -1,4 +1,5 @@
 #include "catnap.h"
+#include "culpeo.h"
 #include "scheduler.h"
 #include "comp.h"
 #include <libio/console.h>
@@ -18,16 +19,17 @@ void update_comp()
 	for (unsigned i = 0; i < MAX_EVENTS; ++i) {
 		// For bursty, this gets a bit conservative
 		evt_t* e = all_events.events[i];
-    if ( e == NULL || e->valid == OFF) {
+    //if ( e == 0 || e->valid == OFF) {
+    if ( e == 0 ) {
       continue;
     }
-    //PRINTF("e: %x, energy: %u\r\n",e,e->energy);
+    PRINTF("e: %x, energy: %u\r\n",i,e->energy);
 		worst_case_energy += e->energy * e->burst_num;
 	}
 	//PRINTF("Budget: %x %x\r\n", (unsigned)(energy_budget >> 16),
   //(unsigned)(energy_budget & 0xFFFF));
-	//PRINTF("Worst: %x %x\r\n", (unsigned)(worst_case_energy >> 16),
-  //(unsigned)(worst_case_energy & 0xFFFF));
+	PRINTF("Worst: %x %x\r\n", (unsigned)(worst_case_energy >> 16),
+  (unsigned)(worst_case_energy & 0xFFFF));
   //TODO modify energy budget
 	if (worst_case_energy > energy_budget) {
 		PRINTF("Comp: Event not schedulable!\r\n");
@@ -37,7 +39,6 @@ void update_comp()
 void calculate_energy_use(evt_t* e, unsigned v_before_event,
 		unsigned v_after_event)
 {
-	//PRINTF("Energy use vs: %u, ve: %u\r\n", v_before_event, v_after_event);
 	uint32_t used_E;
 	if (v_before_event < v_after_event) {
 		used_E = 0;
@@ -45,6 +46,8 @@ void calculate_energy_use(evt_t* e, unsigned v_before_event,
 		used_E = v_before_event*v_before_event
 			- v_after_event*v_after_event;
 	}
+	PRINTF("Energy use vs: %u, ve: %u--> E: %u\r\n", v_before_event,
+  v_after_event,used_E & 0xffff);
 	// Always remember the worst-case energy
 	if (used_E > e->energy) {
 		// Update all reservedE with the same param with current
@@ -52,6 +55,10 @@ void calculate_energy_use(evt_t* e, unsigned v_before_event,
       // If no param, than update all reservedE
       //e->reservedE[i] = used_E;
       e->energy = used_E;
+      glob_sqrt = used_E + 25600 ;
+      e->V_safe = local_sqrt();
+      PRINTF("V_safe is:");
+      print_float(e->V_safe);
 		//}
 		update_comp();
 	}
@@ -129,6 +136,7 @@ unsigned calculate_charge_rate(uint16_t t_charge_end, uint16_t t_charge_start)
 	unsigned schedulable = is_schedulable(worst_charge_rate);
 	while (!schedulable) {
     PRINTF("Not schedulable!\r\n");
+    BIT_FLIP(1,4);
     while(1);
 	}
 
@@ -151,7 +159,8 @@ unsigned is_schedulable(uint32_t charge_rate)
 	for (unsigned i = 0; i < MAX_EVENTS; ++i) {
 		uint32_t tmp;
 		evt_t* event = all_events.events[i];
-    if (event == NULL || event->valid == OFF) {
+    //if (event == NULL || event->valid == OFF) {
+    if (event == NULL) {
       continue;
     }
 		tmp = event->charge_time * event->burst_num;

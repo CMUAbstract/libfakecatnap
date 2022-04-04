@@ -69,9 +69,9 @@ int main(void) {
   // Init comparator
   init_comparator();
   // Code to make 3.5 COUT--> remove all BIT_FLIPS(3,5) to run this
-  /*P3SEL1 |= BIT5;
+  P3SEL1 |= BIT5;
   P3SEL0 &= ~(BIT5);
-  P3DIR |= BIT5;*/
+  P3DIR |= BIT5;
   // on very first boot, pull in starter event
   if (first_boot != MAGIC_NUMBER) {
     add_event(&EVT_FCN_STARTER);
@@ -140,28 +140,38 @@ void scheduler(void) {
         //DOES NOT RETURN
       }
       #endif
-      // Swap context
-      context_t *next = (curctx == &context_0 )? &context_1 : &context_0;
-      next->active_task = curctx->active_task;
-      next->active_evt = nextE;
-      next->mode = EVENT;
-      // enable the absolute lowest threshold so we power off if there's a failure
-      LFCN_DBG_PRINTF("Set low thresh %x\r\n",nextE);
-      BIT_FLIP(1,1);
-      BIT_FLIP(1,1);
-      SET_LOWER_COMP(DEFAULT_MIN_THRES); //TODO may not need this on camaroptera
-      #ifdef CATNAP_FEASIBILITY
-      vstart = turn_on_read_adc(SCALER);
-      #endif
-      LCFN_INTERRUPTS_ENABLE;
-      curctx = next;
-      LFCN_DBG_PRINTF("Jump!\r\n");
-      // Jump
-      __asm__ volatile ( // volatile because output operands unused by C
-          "br %[nt]\n"
-          : /* no outputs */
-          : [nt] "r" (curctx->active_evt->evt)
-      );
+      //TODO streamline the number of adc reads
+      uint16_t test = turn_on_read_adc(SCALER);
+      // Only run event if it's safe, otherwise charge
+      uint16_t V_safe_int = (uint16_t)nextE->V_safe;
+      PRINTF("Cur: %u, V_safe=%u\r\n",test,V_safe_int);
+      if (test > V_safe_int) {
+        // Swap context
+        context_t *next = (curctx == &context_0 )? &context_1 : &context_0;
+        next->active_task = curctx->active_task;
+        next->active_evt = nextE;
+        next->mode = EVENT;
+        // enable the absolute lowest threshold so we power off if there's a failure
+        LFCN_DBG_PRINTF("Set low thresh %x\r\n",nextE);
+        BIT_FLIP(1,1);
+        BIT_FLIP(1,1);
+        SET_LOWER_COMP(DEFAULT_MIN_THRES); //TODO may not need this on camaroptera
+        #ifdef CATNAP_FEASIBILITY
+        vstart = turn_on_read_adc(SCALER);
+        #endif
+        LCFN_INTERRUPTS_ENABLE;
+        curctx = next;
+        LFCN_DBG_PRINTF("Jump!\r\n");
+        // Jump
+        __asm__ volatile ( // volatile because output operands unused by C
+            "br %[nt]\n"
+            : /* no outputs */
+            : [nt] "r" (curctx->active_evt->evt)
+        );
+      }
+      else {
+        tasks_ok = 0; // No tasks for now
+      }
     }
     LFCN_DBG_PRINTF("Pick task? %u\r\n",tasks_ok);
     // First set up timers to wait for an event
@@ -219,34 +229,35 @@ void scheduler(void) {
         );
       }
     }
+    BIT_FLIP(1,1);
+    BIT_FLIP(1,1);
+    BIT_FLIP(1,1);
     // Got to sleep
     curctx->mode = SLEEPING;
-    BIT_FLIP(1,1);
-    BIT_FLIP(1,1);
-    BIT_FLIP(1,1);
     // Grab starting voltage if we're sleeping
     #ifdef CATNAP_FEASIBILITY
     if (curctx->mode != TASK) {
       v_charge_start = turn_on_read_adc(SCALER);
       t_start = TA0R;//TODO is the timer running here?
-      BIT_FLIP(3,5);
+      //BIT_FLIP(3,5);
     }
     #endif
     // Else sleep to recharge
-    SET_MAX_UPPER_COMP(); // Set interrupt when we're fully charged too
-    // measure vcap
     // set compE interrupt/timer
+    BIT_FLIP(1,1);
+    BIT_FLIP(1,1);
+    SET_MAX_UPPER_COMP(); // Set interrupt when we're fully charged too
     // sleep
+    BIT_FLIP(1,1);
+    BIT_FLIP(1,1);
+    BIT_FLIP(1,1);
+    BIT_FLIP(1,1);
+    BIT_FLIP(1,1);
+    BIT_FLIP(1,1);
     LCFN_INTERRUPTS_ENABLE;
     //LFCN_DBG_PRINTF("Sleeping for %u = %u",TA0CCR0,ticks_to_wait);
     __disable_interrupt();
     comp_e_flag = 1; // Flag to get us out
-    BIT_FLIP(1,1);
-    BIT_FLIP(1,1);
-    BIT_FLIP(1,1);
-    BIT_FLIP(1,1);
-    BIT_FLIP(1,1);
-    BIT_FLIP(1,1);
     while((TA0CCTL0 & CCIE) && comp_e_flag) {
       __bis_SR_register(LPM3_bits + GIE);
       //LFCN_DBG_PRINTF("Woo!\r\n");
@@ -267,8 +278,6 @@ void scheduler(void) {
       else {
         t_end = ticks_waited - t_start; //woken up by timer which clobbered ta0r
       }
-      BIT_FLIP(3,5);
-      BIT_FLIP(3,5);
       calculate_charge_rate(t_end,t_start);
       //PRINTF("Got t_end!\r\n");
       t_end = 0;// this is ok because these vars are volatile
@@ -291,7 +300,7 @@ void COMP_VBANK_ISR (void) {
   DISABLE_LFCN_TIMER;// Just in case
   BIT_FLIP(1,4);
   BIT_FLIP(1,4);
-  //PRINTF("in comp\r\n");
+  PRINTF("in comp\r\n");
   volatile int chkpt_flag = 0;
   if (!(CECTL2 & CERSEL)) {
   //LFCN_DBG_PRINTF("comp3\r\n");
@@ -305,6 +314,7 @@ void COMP_VBANK_ISR (void) {
           BIT_FLIP(1,0);
           BIT_FLIP(1,0);
           BIT_FLIP(1,0);
+          PRINTF("shutdown evt\r\n");
           ticks_waited = TA0R;
           capybara_shutdown();
           break;
@@ -318,8 +328,9 @@ void COMP_VBANK_ISR (void) {
             BIT_FLIP(1,0);
             BIT_FLIP(1,0);
             BIT_FLIP(1,0);
+            PRINTF("shutdown tsk\r\n");
             curctx->mode = CHARGING;
-            //capybara_shutdown();
+            capybara_shutdown();
           }
           else {
             curctx->mode = TASK;

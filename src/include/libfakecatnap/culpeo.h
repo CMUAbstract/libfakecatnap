@@ -3,6 +3,8 @@
 
 extern __nv float Vmin;
 extern __nv float Vfinal;
+extern __nv float glob_sqrt;
+float local_sqrt(void);
 
 extern volatile uint8_t culpeo_profiling_flag;
 

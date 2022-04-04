@@ -18,7 +18,7 @@ __nv float glob_sqrt = .5;
 uint16_t culpeo_min_reading = 0xff;
 
 #define cast_out(fval) \
-  (unsigned)(fval*1000)
+  (unsigned)(fval*SCALER)
 
 float inline local_sqrt(void) {
   float x = glob_sqrt;
