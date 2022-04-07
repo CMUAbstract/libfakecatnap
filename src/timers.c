@@ -36,8 +36,13 @@ void update_event_timers(uint16_t ticks) {
         buffer.valid = WAITING; // needs to be after time_rdy update
       }
       else {
-        // Now update ticks waited
-        buffer.time_rdy -= ticks;
+        if (temp_event->periodic == PERIODIC) {
+          // Now update ticks waited
+          buffer.time_rdy -= ticks;
+        }
+        else {
+          buffer.time_rdy = 0;
+        }
       }
       // Set ready bits
       if (buffer.time_rdy <= 0) {

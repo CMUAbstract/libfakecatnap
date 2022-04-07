@@ -18,6 +18,8 @@
 
 //#define LFCN_DBG
 
+#define SLEEP_BITS LPM3_bits
+
 #ifdef LFCN_DBG
   #define LFCN_DBG_PRINTF PRINTF
 #else
@@ -33,12 +35,6 @@
 
 #endif
 
-
-#ifdef CATNAP_FEASIBILITY
-#define SCALER 100
-#else
-#define SCALER 1000
-#endif
 
 #define MAGIC_NUMBER 0xab03
 
@@ -62,6 +58,8 @@ int main(void) {
   // Init capy
   capybara_init(); // TODO may want to slim down
   PRINTF("Boot\r\n");
+  BIT_FLIP(1,1);
+  tasks_ok = 1;
   fail_count++;
   app_hw_init();
   // Init timer
@@ -72,6 +70,7 @@ int main(void) {
   P3SEL1 |= BIT5;
   P3SEL0 &= ~(BIT5);
   P3DIR |= BIT5;
+
   // on very first boot, pull in starter event
   if (first_boot != MAGIC_NUMBER) {
     add_event(&EVT_FCN_STARTER);
@@ -96,12 +95,13 @@ void scheduler(void) {
         #ifdef CATNAP_FEASIBILITY
         vfinal = turn_on_read_adc(SCALER);
         calculate_energy_use(curctx->active_evt,vstart,vfinal);
-        PRINTF("event! %u %u\r\n",vstart,vfinal);
+        PRINTF("event! %u %u\r\n",cr_window_ready,cr_window_it);
         #else
+        vfinal = turn_on_read_adc(SCALER);
         bucket_temp = calc_culpeo_bucket();//TODO only run on changes
         PRINTF("event! ");
-        print_float(curctx->active_evt->V_final);
-        print_float(curctx->active_evt->V_min);
+        //print_float(curctx->active_evt->V_final);
+        //print_float(curctx->active_evt->V_min);
         PRINTF("\r\n");
         #endif
         //TODO fix this setting, we need to account for event time
@@ -113,6 +113,11 @@ void scheduler(void) {
         PRINTF("not event! %x\r\n",curctx->active_task);
         PRINTF("\tnot event! %x\r\n",ticks_waited);
         curctx->mode = CHARGING;
+        break;
+      default:
+        while(1) {
+          PRINTF("Shouldn't be here!!! %u\r\n",curctx->mode);
+        }
         break;
     }
     //dump_events();
@@ -126,7 +131,6 @@ void scheduler(void) {
       print_float(curctx->active_evt->V_final);
       print_float(curctx->active_evt->V_min);
       PRINTF("\r\n");*/
-    BIT_FLIP(1,1);
     // If event, measure vcap
     if (nextE != NULL) {
       LFCN_DBG_PRINTF("NEXTE\r\n");
@@ -134,12 +138,18 @@ void scheduler(void) {
       //TODO make this smarter so we can re-profile easily
       #ifndef CATNAP_FEASIBILITY
       // Culpeo profiling
+      #ifndef CULPEO_PROF_DISABLE
       if (nextE->V_final == 0 || nextE->V_min == 0) {
         profile_event(nextE);
         PRINTF("Should not be here!!!\r\n");
         //DOES NOT RETURN
       }
-      #endif
+      #else
+      //TODO this needs to be more intelligent
+      nextE->V_final = 2.258;
+      nextE->V_min = 2.128;
+      #endif//PROF_DISABLE
+      #endif//CATNAP_FEASIBILITY
       //TODO streamline the number of adc reads
       uint16_t test = turn_on_read_adc(SCALER);
       // Only run event if it's safe, otherwise charge
@@ -153,9 +163,7 @@ void scheduler(void) {
         next->mode = EVENT;
         // enable the absolute lowest threshold so we power off if there's a failure
         LFCN_DBG_PRINTF("Set low thresh %x\r\n",nextE);
-        BIT_FLIP(1,1);
-        BIT_FLIP(1,1);
-        SET_LOWER_COMP(DEFAULT_MIN_THRES); //TODO may not need this on camaroptera
+        SET_LOWER_COMP(DEFAULT_MIN_THRES);
         #ifdef CATNAP_FEASIBILITY
         vstart = turn_on_read_adc(SCALER);
         #endif
@@ -193,20 +201,26 @@ void scheduler(void) {
       SET_LOWER_COMP(DEFAULT_LOWER_THRES); // Interrupt if we got below event thresh
       // Check if there's an active task, and jump to it if there is
       //PRINTF("chkpt: %u,active task? %x, \r\n",curctx->active_task->valid_chkpt,curctx->active_task);
-      if (curctx->active_task != NULL && curctx->active_task->valid_chkpt) {
+      if (curctx->active_task != NULL) {
         context_t *next = (curctx == &context_0 )? &context_1 : &context_0;
         next->active_task = curctx->active_task;
         next->fifo = curctx->fifo;
         next->active_evt = NULL;
-        BIT_FLIP(1,4);
-        BIT_FLIP(1,4);
-        BIT_FLIP(1,4);
         next->mode = TASK;
         //LFCN_DBG_PRINTF("1mode:%u\r\n",curctx->mode);
-        PRINTF("1mode:%u\r\n",curctx->mode);
+        //PRINTF("1mode:%u\r\n",curctx->mode);
         LCFN_INTERRUPTS_ENABLE;
         curctx = next;
-        restore_vol(); // Jump to new task
+        if (next->active_task->valid_chkpt) {
+          restore_vol(); // Jump to new task
+        }
+        else {
+          __asm__ volatile ( // volatile because output operands unused by C
+              "br %[nt]\n"
+              : /* no outputs */
+              : [nt] "r" (curctx->active_task->func)
+          );
+        }
       }
       task_t * nextT = pop_task(); //Start changes
       if ( nextT != NULL) {
@@ -216,9 +230,6 @@ void scheduler(void) {
         next->mode = TASK;
         update_task_fifo(next); // Commit changes since we need to wait until the
                                 // task is latched.
-        BIT_FLIP(1,4);
-        BIT_FLIP(1,4);
-        BIT_FLIP(1,4);
         //LFCN_DBG_PRINTF("mode:%u\r\n",curctx->mode);
         LCFN_INTERRUPTS_ENABLE;
         curctx = next;
@@ -229,9 +240,6 @@ void scheduler(void) {
         );
       }
     }
-    BIT_FLIP(1,1);
-    BIT_FLIP(1,1);
-    BIT_FLIP(1,1);
     // Got to sleep
     curctx->mode = SLEEPING;
     // Grab starting voltage if we're sleeping
@@ -246,29 +254,21 @@ void scheduler(void) {
     // set compE interrupt/timer
     BIT_FLIP(1,1);
     BIT_FLIP(1,1);
+    BIT_FLIP(1,1);
     SET_MAX_UPPER_COMP(); // Set interrupt when we're fully charged too
     // sleep
-    BIT_FLIP(1,1);
-    BIT_FLIP(1,1);
-    BIT_FLIP(1,1);
-    BIT_FLIP(1,1);
-    BIT_FLIP(1,1);
-    BIT_FLIP(1,1);
     LCFN_INTERRUPTS_ENABLE;
     //LFCN_DBG_PRINTF("Sleeping for %u = %u",TA0CCR0,ticks_to_wait);
     __disable_interrupt();
     comp_e_flag = 1; // Flag to get us out
     while((TA0CCTL0 & CCIE) && comp_e_flag) {
-      __bis_SR_register(LPM3_bits + GIE);
+      __bis_SR_register(SLEEP_BITS + GIE);
       //LFCN_DBG_PRINTF("Woo!\r\n");
       __disable_interrupt();
     }
+    BIT_FLIP(1,1);
+    BIT_FLIP(1,1);
     //LFCN_DBG_PRINTF("Done?");
-    BIT_FLIP(1,1);
-    BIT_FLIP(1,1);
-    BIT_FLIP(1,1);
-    BIT_FLIP(1,1);
-    BIT_FLIP(1,1);
     #ifdef CATNAP_FEASIBILITY
     if (curctx->mode != TASK) {
       v_charge_end = turn_on_read_adc(SCALER);
@@ -295,12 +295,30 @@ void scheduler(void) {
 
 __attribute__ ((interrupt(COMP_E_VECTOR)))
 void COMP_VBANK_ISR (void) {
-  COMP_VBANK(INT) &= ~COMP_VBANK(IE);
+  BIT_FLIP(1,4);
+  BIT_FLIP(1,4);
+  if (CEINT | CERDYIFG) {
+    if (!(CEINT & CEIFG) && !(CEINT & CEIIFG)) {
+      CEINT &= ~(CERDYIFG | CERDYIE);
+      return;
+    }
+      CEINT &= ~(CERDYIFG | CERDYIE);
+  }
+  if (ISR_DISABLE) {
+    comp_violation = 1;
+    CEINT = 0;
+    BIT_FLIP(1,5);
+    BIT_FLIP(1,5);
+    return;
+  }
+  comp_violation = 0;
+  CEINT = 0;
+  //COMP_VBANK(INT) &= ~(COMP_VBANK(IE) | COMP_VBANK(IIE));
   //COMP_VBANK(CTL1) &= ~COMP_VBANK(ON);
   DISABLE_LFCN_TIMER;// Just in case
-  BIT_FLIP(1,4);
-  BIT_FLIP(1,4);
-  PRINTF("in comp\r\n");
+  //PRINTF("in comp %x, %",(CEINT),CEIV);
+  //PRINTF("in comp %x, %x, %x\r\n",CECTL2,CECTL1,CECTL0);
+  //CEINT = ~(CEIFG | CEIIFG);
   volatile int chkpt_flag = 0;
   if (!(CECTL2 & CERSEL)) {
   //LFCN_DBG_PRINTF("comp3\r\n");
@@ -309,11 +327,7 @@ void COMP_VBANK_ISR (void) {
       switch (curctx->mode) {
         case CHARGING:
         case EVENT:
-        case SLEEPING:{
-          BIT_FLIP(1,0);
-          BIT_FLIP(1,0);
-          BIT_FLIP(1,0);
-          BIT_FLIP(1,0);
+    case SLEEPING:{
           PRINTF("shutdown evt\r\n");
           ticks_waited = TA0R;
           capybara_shutdown();
@@ -325,9 +339,6 @@ void COMP_VBANK_ISR (void) {
           chkpt_flag = 1;
           if (chkpt_flag) {
             ticks_waited = TA0R;
-            BIT_FLIP(1,0);
-            BIT_FLIP(1,0);
-            BIT_FLIP(1,0);
             PRINTF("shutdown tsk\r\n");
             curctx->mode = CHARGING;
             capybara_shutdown();
@@ -356,8 +367,6 @@ void COMP_VBANK_ISR (void) {
       chkpt_flag = 1;
       // Jump to scheduler
       if ( chkpt_flag == 1) {
-        BIT_FLIP(1,0);
-        BIT_FLIP(1,0);
         curctx->mode = CHARGING;
         ticks_waited = TA0R;
         __asm__ volatile ( // volatile because output operands unused by C
@@ -373,19 +382,14 @@ void COMP_VBANK_ISR (void) {
   }
   else {/*Charged to max*/
     /* allow tasks again */ 
-    BIT_FLIP(1,4);
-    BIT_FLIP(1,4);
-    BIT_FLIP(1,4);
-    BIT_FLIP(1,4);
     // SWitch to worrying about the minimum
-    //LFCN_DBG_PRINTF("Set min! %x\r\n",LEVEL_MASK & CECTL2);
+    LFCN_DBG_PRINTF("Set min! %x\r\n",LEVEL_MASK & CECTL2);
     SET_LOWER_COMP(DEFAULT_MIN_THRES);
     ticks_waited = TA0R;
-    __bic_SR_register_on_exit(LPM3_bits); //wake up
+    __bic_SR_register_on_exit(SLEEP_BITS); //wake up
     comp_e_flag = 0;
     tasks_ok = 1;
   }
-  BIT_FLIP(1,0);
   COMP_VBANK(INT) |= COMP_VBANK(IE);
   ENABLE_LFCN_TIMER;// Just in case
 }
@@ -426,7 +430,7 @@ timerISRHandler(void) {
     return;
   }
   BIT_FLIP(1,5);
-  __bic_SR_register_on_exit(LPM3_bits); //wake up
+  __bic_SR_register_on_exit(SLEEP_BITS); //wake up
 /*--------------------------------------------------------*/
 #ifndef LFCN_CONT_POWER
 	CEINT |= CEIE; // Re-enable checkpoint interrupt
@@ -437,8 +441,6 @@ timerISRHandler(void) {
 void __attribute__((interrupt(PORT1_VECTOR)))
 timerISRHandler(void) {
   P1IE &= ~BIT0;
-  BIT_FLIP(1,5);
-  BIT_FLIP(1,5);
   P1IFG = 0;
   // Record wait time
   //ticks_waited = ticks_to_wait;
@@ -457,7 +459,7 @@ timerISRHandler(void) {
     }
     return;
   }
-  __bic_SR_register_on_exit(LPM3_bits); //wake up
+  __bic_SR_register_on_exit(SLEEP_BITS); //wake up
   P1IE |= BIT0;
 }
 #endif

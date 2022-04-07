@@ -53,8 +53,11 @@ void print_float(float f)
 
 
 culpeo_V_t calc_culpeo_vsafe(void) {
+  PRINTF("Calc_vsafe:");
+  print_float(Vfinal);
+  print_float(Vmin);
   float Vd = Vfinal - Vmin;
-  float scale = Vmin*m_float + b_float;
+  float scale = Vmin*(m_float*Vmin + b_float);
   scale /= Vd_const_float;
   float Vd_scaled = Vd*scale;
   scale = 1- Vd_scaled;
@@ -65,10 +68,10 @@ culpeo_V_t calc_culpeo_vsafe(void) {
   Ve_squared -= temp;
   glob_sqrt = Ve_squared;
   float Ve = local_sqrt();
-  //print_float(Ve);
+  print_float(Ve+Vd_scaled);
   culpeo_V_t ve_int = cast_out(Ve);
   culpeo_V_t vd_int = cast_out(Vd_scaled);
-  //PRINTF("Ve: %u, Vd: %u\r\n",ve_int,vd_int);
+  PRINTF("Ve: %u, Vd: %u\r\n",ve_int,vd_int);
   uint16_t Vsafe = ve_int + vd_int;
   return Vsafe;
 }
@@ -126,6 +129,14 @@ do { \
 #define CULPEO_ADC_DISABLE \
 		ADC12CTL0 &= ~(ADC12ENC | ADC12ON);
 
+#define CULPEO_ADC_FULLY_OFF \
+  ADC12CTL0 = 0;\
+  ADC12CTL1 = 0;\
+  ADC12CTL2 = 0x11;\
+  ADC12IER0 = 0;\
+  TA1CTL = 0; \
+  TA1CCTL0 = 0;
+
 #define CULPEO_PROF_TIMER_ENABLE \
 	TA1CCR0 = 8000;\
 	TA1CTL = MC__UP | TASSEL__SMCLK;\
@@ -139,15 +150,14 @@ volatile uint8_t culpeo_profiling_flag = 0;
 
 //Look, this really is intrinsice to the calculations we're doing here. It is
 //customized to the divider, but meh
-#define CULPEO_VHIGH 1875
+#define CULPEO_VHIGH 1865
 
 void culpeo_charging(){ 
   uint16_t adc_reading = 0x00;
-  PRINTF("Charging!\r\n"); 
   //Configure P1.2 for ADC
   P1SEL1 |= BIT2;
   P1SEL0 |= BIT2;
-
+  PRINTF("Charging!\r\n");
   ADC12CTL0 &= ~ADC12ENC;           // Disable ADC
   ADC12CTL0 = ADC12SHT0_2 | ADC12ON;      // Sampling time, S&H=16, ADC12 on
   ADC12CTL1 = ADC12SHP;                   // Use sampling timer
@@ -175,6 +185,12 @@ void culpeo_charging(){
       capybara_shutdown();
     }
   }
+  // Disable incoming power
+  //TODO do we need this?
+  //P1OUT |= BIT1;
+  //P1DIR |= BIT1;
+  __delay_cycles(80000);
+
   while( adc_reading > CULPEO_VHIGH){
     // ======== Configure ADC ========
     // Take single sample when timer triggers and compare with threshold
@@ -188,8 +204,18 @@ void culpeo_charging(){
 
     ADC12CTL0 &= ~ADC12ENC;           // Disable ADC
     //burn
+    for(int i = 0; i < 0xA0;i++){
+      //for(int j = 0; j < 0xff;j++){
+        volatile temp = i;
+      //}
+    }
     __delay_cycles(8000);
+    //PRINTF("Burn!\r\n");
   }
+  BIT_FLIP(1,5);
+  BIT_FLIP(1,5);
+  BIT_FLIP(1,5);
+  BIT_FLIP(1,5);
   adc_reading = 0;
 }
 
@@ -212,7 +238,7 @@ int profile_event(evt_t *ev) {
   next->active_evt = ev;
   next->mode = EVENT;
   curctx = next;
-  PRINTF("Jump!\r\n");
+  PRINTF("Profiling!\r\n");
   // Jump
   __asm__ volatile ( // volatile because output operands unused by C
       "br %[nt]\n"
@@ -221,13 +247,20 @@ int profile_event(evt_t *ev) {
   );
 }
 
-// 
+//
 
 int profile_cleanup(evt_t *ev) {
   CULPEO_PROF_TIMER_DISABLE;
   // sleep
+  BIT_FLIP(1,5);
   __delay_cycles(800000);//100ms
-  uint16_t temp = read_adc();  
+  uint16_t temp = read_adc();
+  CULPEO_ADC_FULLY_OFF;
+  BIT_FLIP(1,5);
+  // Re-enable incoming power
+  //P1OUT &= ~BIT1;
+  //__delay_cycles(80);
+  //P1DIR &= ~BIT1;
   Vmin = (float)culpeo_min_reading/800.0;
   Vfinal = (float)temp/800.0;
   ev->V_safe = calc_culpeo_vsafe();
@@ -241,6 +274,7 @@ void __attribute__((interrupt(TIMER1_A0_VECTOR)))
 timerA1ISRHandler(void) {
     uint16_t val;
     //PRINTF("ms timer\r\n");
+    BIT_FLIP(1,1);
     TA1R = 0;
     val = read_adc();
     if (culpeo_min_reading > val) {

@@ -21,6 +21,7 @@ void update_comp();
 #define U_AMP_FACTOR  100
 
 #define V_OFF_SQUARED 25600
+//#define V_OFF_SQUARED 32400
 
 #define CR_WINDOW_SIZE 3
 

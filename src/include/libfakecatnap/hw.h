@@ -15,6 +15,9 @@ extern __nv uint16_t vstart;
 extern uint16_t t_start;
 extern uint16_t t_end;
 
+extern volatile uint8_t comp_violation;
+extern volatile uint8_t  ISR_DISABLE;
+
 
 #ifndef GDB_INT_CFG
 
@@ -23,12 +26,21 @@ extern uint16_t t_end;
 
 #define LCFN_INTERRUPTS_DISABLE \
   TA0CCTL0 &= ~CCIE; \
-	CEINT &= ~(CEIE | CEIIE);
+  ISR_DISABLE = 1; \
+
 
 #ifndef LFCN_CONT_POWER
+
 #define LCFN_INTERRUPTS_ENABLE \
+  BIT_FLIP(1,4); \
+  ISR_DISABLE = 0;\
+  /*if (comp_violation | (CECTL1 & CEOUT))*/\
+  if (comp_violation) { \
+    BIT_FLIP(1,4); \
+    CEINT |= CEIFG;\
+  }\
+	CEINT |= (CEIE | CEIIE);\
   TA0CCTL0 |= CCIE; \
-	CEINT |= (CEIE | CEIIE);
 
 #else//CONT_POWER
 

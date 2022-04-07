@@ -16,15 +16,18 @@
 // This represents energy in 1.31V - 1.08V
 #define E_OPERATING 3*E_QUANTA 
 
-#define DEFAULT_LOWER_THRES V_2_20
+//#define DEFAULT_LOWER_THRES V_2_20
+//#define DEFAULT_MIN_THRES V_1_78
+
+//#define DEFAULT_MIN_THRES V_1_43
 #define DEFAULT_MIN_THRES V_1_54
-#define DEFAULT_UPPER_THRES V_2_44
-#define DEFAULT_NEARLY_MAX_THRES V_2_44
+#define DEFAULT_UPPER_THRES V_2_40
+#define DEFAULT_NEARLY_MAX_THRES V_2_40
 // 0.5865
-#define V_NEARLY_MAX 260
+#define V_NEARLY_MAX 240
 
 
-#define THRES_MAX V_2_48
+#define THRES_MAX V_2_40
 #define NUM_LEVEL 55
 
 
@@ -48,7 +51,7 @@ extern const energy_t level_to_E[NUM_LEVEL];
 	CECTL2 &= ~CERSEL;\
   CECTL1 = CEPWRMD_2 | CEON; \
 	while (!CERDYIFG);\
-	CEINT &= ~(CEIFG | CEIIFG);\
+	CEINT = 0;\
 	/*CEINT |= CEIE;*/\
   if (CECTL1 & CEOUT) { \
     CEINT |= CEIFG;\
@@ -64,7 +67,7 @@ extern const energy_t level_to_E[NUM_LEVEL];
 	CECTL2 |= CERSEL;\
   CECTL1 = CEPWRMD_2 | CEON; \
 	while (!CERDYIFG);\
-	CEINT &= ~(CEIFG | CEIIFG);\
+	CEINT = 0;\
 	CEINT |= CEIE;\
   if (CECTL1 & CEOUT) {\
     CEINT |= CEIFG;\

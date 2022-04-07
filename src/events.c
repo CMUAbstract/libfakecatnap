@@ -13,6 +13,7 @@ int event_return() {
     PRINTF("vmin/Vfinal %x ",evt);
     print_float(evt->V_min);
     print_float(evt->V_final);
+    //capybara_shutdown();
   }
   __asm__ volatile ( // volatile because output operands unused by C
       "br %[nt]\n"

@@ -4,7 +4,7 @@
 __nv volatile energy_t baseline_E = 0;
 __nv volatile unsigned lower_thres = DEFAULT_LOWER_THRES;
 __nv volatile unsigned upper_thres = DEFAULT_UPPER_THRES;
-__nv volatile unsigned max_thres = DEFAULT_NEARLY_MAX_THRES;
+__nv volatile unsigned max_thres = DEFAULT_TASK_UPPER_HYST;
 
 // Volt * 100
 __ro_nv const unsigned level_to_volt[NUM_LEVEL] = {

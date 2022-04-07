@@ -23,13 +23,13 @@ void update_comp()
     if ( e == 0 ) {
       continue;
     }
-    PRINTF("e: %x, energy: %u\r\n",i,e->energy);
+    //PRINTF("e: %x, energy: %u\r\n",i,e->energy);
 		worst_case_energy += e->energy * e->burst_num;
 	}
 	//PRINTF("Budget: %x %x\r\n", (unsigned)(energy_budget >> 16),
   //(unsigned)(energy_budget & 0xFFFF));
-	PRINTF("Worst: %x %x\r\n", (unsigned)(worst_case_energy >> 16),
-  (unsigned)(worst_case_energy & 0xFFFF));
+	//PRINTF("Worst: %x %x\r\n", (unsigned)(worst_case_energy >> 16),
+  //(unsigned)(worst_case_energy & 0xFFFF));
   //TODO modify energy budget
 	if (worst_case_energy > energy_budget) {
 		PRINTF("Comp: Event not schedulable!\r\n");
@@ -46,8 +46,8 @@ void calculate_energy_use(evt_t* e, unsigned v_before_event,
 		used_E = v_before_event*v_before_event
 			- v_after_event*v_after_event;
 	}
-	PRINTF("Energy use vs: %u, ve: %u--> E: %u\r\n", v_before_event,
-  v_after_event,used_E & 0xffff);
+	//PRINTF("Energy use vs: %u, ve: %u--> E: %u\r\n", v_before_event,
+  //v_after_event,used_E & 0xffff);
 	// Always remember the worst-case energy
 	if (used_E > e->energy) {
 		// Update all reservedE with the same param with current
@@ -55,9 +55,9 @@ void calculate_energy_use(evt_t* e, unsigned v_before_event,
       // If no param, than update all reservedE
       //e->reservedE[i] = used_E;
       e->energy = used_E;
-      glob_sqrt = used_E + 25600 ;
+      glob_sqrt = used_E + V_OFF_SQUARED ;
       e->V_safe = local_sqrt();
-      PRINTF("V_safe is:");
+      //PRINTF("V_safe is:");
       print_float(e->V_safe);
 		//}
 		update_comp();
@@ -69,9 +69,8 @@ unsigned calculate_charge_rate(uint16_t t_charge_end, uint16_t t_charge_start)
 	unsigned rate_changed = 0;
 	uint32_t charge_rate;
 
-	PRINTF("Chrg: vs: %u, ve: %u\r\n", v_charge_start, v_charge_end);
-	PRINTF("Chrg: Ts: %u, Te: %u\r\n", t_charge_start, t_charge_end);
-  //PRINTF("IT:%u %u \r\n",cr_window_it, cr_window_ready);
+	//PRINTF("Chrg: vs: %u, ve: %u\r\n", v_charge_start, v_charge_end);
+	//PRINTF("Chrg: Ts: %u, Te: %u\r\n", t_charge_start, t_charge_end);  //PRINTF("IT:%u %u \r\n",cr_window_it, cr_window_ready);
 	if (!v_charge_start) {
 		goto calculate_charge_rate_cleanup;
 	}
@@ -134,10 +133,12 @@ unsigned calculate_charge_rate(uint16_t t_charge_end, uint16_t t_charge_start)
 
 	// Calculate schedulability
 	unsigned schedulable = is_schedulable(worst_charge_rate);
-	while (!schedulable) {
+  if (!schedulable) {
     PRINTF("Not schedulable!\r\n");
-    BIT_FLIP(1,4);
-    while(1);
+      BIT_FLIP(1,4);
+   /* while(1) {
+      BIT_FLIP(1,4);
+    }*/
 	}
 
 calculate_charge_rate_cleanup:
@@ -166,11 +167,11 @@ unsigned is_schedulable(uint32_t charge_rate)
 		tmp = event->charge_time * event->burst_num;
 		tmp *= U_AMP_FACTOR; // Amplify
 		tmp /= (uint32_t)event->period;
-    PRINTF("charge time: %u T: %u\r\n", (unsigned)event->charge_time,
-    event->period);
+    //PRINTF("charge time: %u T: %u\r\n", (unsigned)event->charge_time,
+    //event->period);
 		U += tmp;
 	}
-	PRINTF("U: %x %x\r\n", (unsigned)(U >> 16), (unsigned)(U & 0xFFFF));
+	//PRINTF("U: %x %x\r\n", (unsigned)(U >> 16), (unsigned)(U & 0xFFFF));
 	if (U <= 100) {
 		return 1;
 	} else {

@@ -124,11 +124,6 @@ void checkpoint() {
   save_stack();
   __asm__ volatile ("MOVX.A &0x0FB90, R4");
   curctx->active_task->valid_chkpt = 1;
-  BIT_FLIP(1,0);
-  BIT_FLIP(1,0);
-  BIT_FLIP(1,0);
-  BIT_FLIP(1,0);
-  BIT_FLIP(1,0);
   chkpt_finished = 1;
 }
 

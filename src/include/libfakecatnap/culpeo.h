@@ -18,6 +18,7 @@ void print_float(float f);
 // voltage where we multiply by 1000 to get 3 decimal places of precision
 typedef uint16_t culpeo_V_t;
 
+#if 1
 //VE terms
 // VE^2 = Vs_term - n_ratio*Vf**2 + Voff_squared
 // TODO actually document this
@@ -29,10 +30,21 @@ typedef uint16_t culpeo_V_t;
 //Vd terms
 #define Vd_const_float 1.0887018
 // Vd = (Vf-Vmin)*(Vmin*m+b)/Vd_const
+#else //Terms for Voff = 1.8
+
+#define Voff_sq_float  3.24
+#define n_ratio_float  1.1365818
+#define Vs_const_float  6.5467110
+#define Vd_const_float  1.2832105
+
+#endif
+
 // Booster efficiency terms
+//m = 0.16228070175438583; b= 0.4207894736842105
 #define m_float 0.1622807
 #define b_float 0.4207894
-//m = 0.16228070175438583; b= 0.4207894736842105
+
+
 #define CULPEO_SCALE 10000
 
 culpeo_V_t calc_culpeo_vsafe(void);

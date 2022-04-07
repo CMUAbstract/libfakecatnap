@@ -9,6 +9,9 @@ uint16_t __nv vstart = 0;
 uint16_t t_start = 0;
 uint16_t t_end = 0;
 
+uint8_t volatile comp_violation = 0;
+uint8_t volatile ISR_DISABLE = 0;
+
 #ifndef GDB_INT_CFG
 void start_timer(uint16_t time) {
 	// Set and fire Timer A
@@ -43,7 +46,7 @@ void init_comparator() {
 	// Let the comparator output settle before checking or setting up interrupt
 	while (!CERDYIFG);
 	// clear int flag and enable int
-	CEINT &= ~(CEIFG | CEIIFG);
+	CEINT =  0;
 #ifndef LFCN_CONT_POWER
 	CEINT |= CEIE;
 #endif
@@ -71,7 +74,7 @@ uint16_t turn_on_read_adc(uint16_t scaler) {
 	ADC12MCTL0 = ADC12INCH_2; // VR+: VREF, VR- = AVSS, // Channel A15
 	ADC12CTL0 |= ADC12SHT03 | ADC12ON; // sample and hold time 32 ADC12CLK
 
-	while( REFCTL0 & REFGENBUSY );
+	while( REFCTL0 & REFGENBUSY );//TODO can we get rid of reference?
 
 	// If this works as I expect,
 	// N = 4096 * (Vin + 0.5*(2.0/4096)) / (2.0) = 4096*Vin/2.0 + 0.5
