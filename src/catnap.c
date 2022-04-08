@@ -52,12 +52,29 @@ volatile __nv uint8_t tasks_ok = 1;
 
 __nv uint8_t fail_count = 0;
 
+__nv uint8_t mem_void = 0;
+
+void protect_memory() {
+  MPUCTL0 = MPUPW;
+  MPUSEGB2 = 0x1038; // memory address 0x10000
+  MPUSEGB1 = 0x0ff8; // memory address 0x0fc00
+  MPUSAM &= ~MPUSEG2WE; // disallow writes
+  MPUSAM |= MPUSEG2VS;  // reset CPU on violation
+  MPUCTL0 = MPUPW | MPUENA;
+  MPUCTL0_H = 0;
+  mem_void = 1;
+}
 
 // Main function to handle boot and kick us off
 int main(void) {
   // Init capy
   capybara_init(); // TODO may want to slim down
+  //protect_memory();
   PRINTF("Boot\r\n");
+  if (mem_void) {
+    PRINTF("Memory failure\r\n");
+    mem_void = 0;
+  }
   BIT_FLIP(1,1);
   tasks_ok = 1;
   fail_count++;
@@ -162,7 +179,7 @@ void scheduler(void) {
         next->active_evt = nextE;
         next->mode = EVENT;
         // enable the absolute lowest threshold so we power off if there's a failure
-        LFCN_DBG_PRINTF("Set low thresh %x\r\n",nextE);
+        LFCN_DBG_PRINTF("Set low thresh %x\r\n",DEFAULT_MIN_THRES);
         SET_LOWER_COMP(DEFAULT_MIN_THRES);
         #ifdef CATNAP_FEASIBILITY
         vstart = turn_on_read_adc(SCALER);
@@ -197,8 +214,8 @@ void scheduler(void) {
     BIT_FLIP(1,5);
     BIT_FLIP(1,5);
     if (temp > event_threshold && tasks_ok) { // Only pick a task if we're above the thresh
-      LFCN_DBG_PRINTF("Set thresh %u, tasks ok: %u\r\n",event_threshold,tasks_ok);
-      SET_LOWER_COMP(DEFAULT_LOWER_THRES); // Interrupt if we got below event thresh
+      LFCN_DBG_PRINTF("Set thresh %u, lvl %u\r\n",event_threshold,lower_thres);
+      SET_LOWER_COMP(lower_thres); // Interrupt if we got below event thresh
       // Check if there's an active task, and jump to it if there is
       //PRINTF("chkpt: %u,active task? %x, \r\n",curctx->active_task->valid_chkpt,curctx->active_task);
       if (curctx->active_task != NULL) {
@@ -291,14 +308,17 @@ void scheduler(void) {
   return; // Should not get here
 }
 
-
+uint16_t store = 0;
 
 __attribute__ ((interrupt(COMP_E_VECTOR)))
 void COMP_VBANK_ISR (void) {
   BIT_FLIP(1,4);
   BIT_FLIP(1,4);
   if (CEINT | CERDYIFG) {
+    store = CECTL2;
     if (!(CEINT & CEIFG) && !(CEINT & CEIIFG)) {
+      BIT_FLIP(1,4);
+      BIT_FLIP(1,4);
       CEINT &= ~(CERDYIFG | CERDYIE);
       return;
     }
@@ -316,7 +336,7 @@ void COMP_VBANK_ISR (void) {
   //COMP_VBANK(INT) &= ~(COMP_VBANK(IE) | COMP_VBANK(IIE));
   //COMP_VBANK(CTL1) &= ~COMP_VBANK(ON);
   DISABLE_LFCN_TIMER;// Just in case
-  //PRINTF("in comp %x, %",(CEINT),CEIV);
+  //PRINTF("in comp %x,\r\n",store);
   //PRINTF("in comp %x, %x, %x\r\n",CECTL2,CECTL1,CECTL0);
   //CEINT = ~(CEIFG | CEIIFG);
   volatile int chkpt_flag = 0;
@@ -327,8 +347,8 @@ void COMP_VBANK_ISR (void) {
       switch (curctx->mode) {
         case CHARGING:
         case EVENT:
-    case SLEEPING:{
-          PRINTF("shutdown evt\r\n");
+        case SLEEPING:{
+          PRINTF("shutdown evt %u\r\n",curctx->mode);
           ticks_waited = TA0R;
           capybara_shutdown();
           break;
@@ -355,9 +375,10 @@ void COMP_VBANK_ISR (void) {
       }
     }
     else { /* We hit the event bucket threshold*/ /* Stop task, jump back to scheduler so we start charging*/
-    //LFCN_DBG_PRINTF("comp2 %x\r\n",CECTL2);
+    LFCN_DBG_PRINTF("comp2 %x\r\n",CECTL2);
       tasks_ok = 0;
       if (curctx->mode != TASK) {
+        LFCN_DBG_PRINTF("Mode: %u\r\n",curctx->mode);
         return; // If we're not in a task just return w/out a checkpoint
       }
       volatile int chkpt_flag;

@@ -10,6 +10,8 @@ unsigned is_schedulable(uint32_t charge_rate);
 unsigned calculate_charge_rate(uint16_t t_charge_end, uint16_t t_charge_start);
 void calculate_energy_use(evt_t* e, unsigned v_before_event, unsigned v_after_event);
 void update_comp();
+uint8_t energy_to_volt(energy_t);
+unsigned thresh_to_voltage(uint8_t index);
 
 // STAY BELOW 2.56V or the squared voltage (translated to 256) doesn't fit in a
 // uint16_t!

@@ -20,7 +20,7 @@
 //#define DEFAULT_MIN_THRES V_1_78
 
 //#define DEFAULT_MIN_THRES V_1_43
-#define DEFAULT_MIN_THRES V_1_54
+#define DEFAULT_MIN_THRES V_1_60
 #define DEFAULT_UPPER_THRES V_2_40
 #define DEFAULT_NEARLY_MAX_THRES V_2_40
 // 0.5865
@@ -45,6 +45,7 @@ extern const energy_t level_to_E[NUM_LEVEL];
 #ifndef LFCN_CONT_POWER
 
 #define SET_LOWER_COMP(val)\
+  BIT_FLIP(1,1); BIT_FLIP(1,1);BIT_FLIP(1,1);BIT_FLIP(1,1);\
 	CECTL0 = CEIMEN | CEIMSEL_13;\
 	CECTL2 = CEREFL_0;\
 	CECTL2 = CERS_2 | level_to_reg[val];\
@@ -53,14 +54,16 @@ extern const energy_t level_to_E[NUM_LEVEL];
 	while (!CERDYIFG);\
 	CEINT = 0;\
 	/*CEINT |= CEIE;*/\
-  if (CECTL1 & CEOUT) { \
+  /*if (CECTL1 & CEOUT) { \
     CEINT |= CEIFG;\
-  }\
+  }*/\
   CEINT &= ~(CEIE | CEIIE);
 
 
 //	upper_thres = level;
 #define SET_UPPER_COMP(val)\
+  BIT_FLIP(1,1); BIT_FLIP(1,1);BIT_FLIP(1,1);BIT_FLIP(1,1);\
+	BIT_FLIP(1,1);\
 	CECTL0 = CEIPEN | CEIPSEL_13; \
 	CECTL2 = CEREFL_0;\
 	CECTL2 = CERS_2 | level_to_reg[val];\
@@ -68,14 +71,16 @@ extern const energy_t level_to_E[NUM_LEVEL];
   CECTL1 = CEPWRMD_2 | CEON; \
 	while (!CERDYIFG);\
 	CEINT = 0;\
-	CEINT |= CEIE;\
-  if (CECTL1 & CEOUT) {\
+	/*CEINT |= CEIE;*/\
+  /*if (CECTL1 & CEOUT) {\
     CEINT |= CEIFG;\
-  }\
+  }*/\
   CEINT &= ~(CEIE | CEIIE);
 
 #define SET_MAX_UPPER_COMP()\
-	CECTL0 = CEIPEN | CEIPSEL_13; \
+  BIT_FLIP(1,1); BIT_FLIP(1,1);BIT_FLIP(1,1);BIT_FLIP(1,1);\
+	BIT_FLIP(1,1);BIT_FLIP(1,1);\
+  CECTL0 = CEIPEN | CEIPSEL_13; \
 	CECTL2 = CEREFL_0;\
 	CECTL2 = CERS_2 | level_to_reg[max_thres];\
 	CECTL2 |= CERSEL;\
@@ -83,9 +88,9 @@ extern const energy_t level_to_E[NUM_LEVEL];
 	while (!CERDYIFG);\
 	CEINT &= ~(CEIFG | CEIIFG); \
 	/*CEINT |= CEIE;*/\
-  if (CECTL1 & CEOUT) {\
+  /*if (CECTL1 & CEOUT) {\
     CEINT |= CEIFG;\
-  }\
+  }*/\
   CEINT &= ~(CEIE | CEIIE);
 
 #else//CONT_POWER
@@ -157,6 +162,8 @@ V_2_44 = 52 ,
 V_2_46 = 53 ,
 V_2_48 = 54 
 };
+
+
 #endif
 #if 0
 // Are these supposed to be evenly spaced?
@@ -201,7 +208,9 @@ enum voltage {
 
 extern const unsigned level_to_reg[NUM_LEVEL];
 extern const unsigned level_to_volt[NUM_LEVEL];
+extern const energy_t level_to_E_catnap[NUM_LEVEL];
 
 energy_t get_ceiled_level(energy_t e);
+
 
 #endif

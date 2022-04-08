@@ -44,6 +44,7 @@ void save_stack()
   // Had to reverse direction because MSP430 stack grows down
   if ((unsigned int)stack_start - (unsigned int)(*(CURR_SP)) > 0x400) {
     PRINTF("Stack overflow!\r\n");
+    while(1);
   }
   while( (unsigned int)stack_start > *CURR_SP) {
     *save_point = *stack_start;

@@ -2,6 +2,7 @@
 #include "culpeo.h"
 #include "scheduler.h"
 #include "comp.h"
+#include "hw.h"
 #include <libio/console.h>
 
 volatile __nv uint32_t cr_window[CR_WINDOW_SIZE] = {0xffffffff,0xffffffff,0xffffffff};
@@ -26,6 +27,15 @@ void update_comp()
     //PRINTF("e: %x, energy: %u\r\n",i,e->energy);
 		worst_case_energy += e->energy * e->burst_num;
 	}
+  lower_thres = energy_to_volt(worst_case_energy);
+  //TODO poorly named... this should be upper_thres
+  max_thres = lower_thres + 10; //TODO can't tolerate V resolution changes
+  if (max_thres >= NUM_LEVEL) {
+    PRINTF("Error! max thres too high\r\n");
+    while(1);
+  }
+  event_threshold = thresh_to_voltage(lower_thres);
+  PRINTF("|%u %u %u:thresholds\r\n",lower_thres,max_thres,event_threshold);
 	//PRINTF("Budget: %x %x\r\n", (unsigned)(energy_budget >> 16),
   //(unsigned)(energy_budget & 0xFFFF));
 	//PRINTF("Worst: %x %x\r\n", (unsigned)(worst_case_energy >> 16),
@@ -217,5 +227,30 @@ uint32_t get_charge_rate_worst()
 	return worst;
 }
 
+unsigned thresh_to_voltage(uint8_t index) {
+  unsigned val;
+  if (SCALER == 100){
+    val = 140 + (index << 1);
+  }
+  else {//SCALER == 1000
+    val = 1400 + (index << 1)*10;
+  }
+  return val;
+}
 
+// Return the level (voltage) so that
+// (V-1)^2 * 10000 > e
+uint8_t energy_to_volt(energy_t e) {
+	// linear search. Because I am lazy
+  PRINTF("E: %x %x\r\n", (unsigned)(e >> 16),
+    (unsigned)(e & 0xFFFF));
+	for (unsigned i = DEFAULT_MIN_THRES+1; i < NUM_LEVEL; ++i) {
+		// TODO: This should be pre-calculated
+		energy_t e2 = level_to_E_catnap[i] - V_OFF_SQUARED;
+		if (e2 > e) {
+			return i;
+		}
+	}
+	return 0xff;
+}
 
