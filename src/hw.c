@@ -12,12 +12,16 @@ uint16_t t_end = 0;
 uint8_t volatile comp_violation = 0;
 uint8_t volatile ISR_DISABLE = 0;
 
+#define MIN_TIME_STEP 10
+
 #ifndef GDB_INT_CFG
 void start_timer(uint16_t time) {
 	// Set and fire Timer A
-	TA0CCR0 = time;
-	TA0CTL = MC_1 | TASSEL_1 | TACLR | ID_3 | TAIE;
-  TA0CCTL0 |= CCIE;
+  if (time > MIN_TIME_STEP) {
+    TA0CCR0 = time;
+    TA0CTL = MC_1 | TASSEL_1 | TACLR | ID_3 | TAIE;
+    TA0CCTL0 |= CCIE;
+  }
 }
 #else
 void start_timer(uint16_t time) {

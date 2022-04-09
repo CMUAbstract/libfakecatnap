@@ -16,6 +16,7 @@
 
 
 
+
 typedef enum activity_ {
   CHARGING,
   SLEEPING,

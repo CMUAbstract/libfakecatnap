@@ -7,6 +7,7 @@
 #include <libmsp/periph.h>
 #include <libio/console.h>
 #include <float.h>
+#include "print_util.h"
 #include "catnap.h"
 #include "checkpoint.h"
 #include "culpeo.h"
@@ -20,11 +21,6 @@
 
 #define SLEEP_BITS LPM3_bits
 
-#ifdef LFCN_DBG
-  #define LFCN_DBG_PRINTF PRINTF
-#else
-  #define LFCN_DBG_PRINTF(...)
-#endif
 
 #ifndef BIT_FLIP
 
@@ -52,29 +48,12 @@ volatile __nv uint8_t tasks_ok = 1;
 
 __nv uint8_t fail_count = 0;
 
-__nv uint8_t mem_void = 0;
-
-void protect_memory() {
-  MPUCTL0 = MPUPW;
-  MPUSEGB2 = 0x1038; // memory address 0x10000
-  MPUSEGB1 = 0x0ff8; // memory address 0x0fc00
-  MPUSAM &= ~MPUSEG2WE; // disallow writes
-  MPUSAM |= MPUSEG2VS;  // reset CPU on violation
-  MPUCTL0 = MPUPW | MPUENA;
-  MPUCTL0_H = 0;
-  mem_void = 1;
-}
 
 // Main function to handle boot and kick us off
 int main(void) {
   // Init capy
   capybara_init(); // TODO may want to slim down
-  //protect_memory();
   PRINTF("Boot\r\n");
-  if (mem_void) {
-    PRINTF("Memory failure\r\n");
-    mem_void = 0;
-  }
   BIT_FLIP(1,1);
   tasks_ok = 1;
   fail_count++;
@@ -105,7 +84,7 @@ int main(void) {
 
 void scheduler(void) {
   while(1) {
-    LCFN_INTERRUPTS_DISABLE;
+    LCFN_INTERRUPTS_INTERNAL_DISABLE;
     culpeo_V_t bucket_temp;
     switch (curctx->mode) {
       case EVENT:
@@ -116,7 +95,7 @@ void scheduler(void) {
         #else
         vfinal = turn_on_read_adc(SCALER);
         bucket_temp = calc_culpeo_bucket();//TODO only run on changes
-        PRINTF("event! ");
+        PRINTF("event! %x ",ticks_waited);
         //print_float(curctx->active_evt->V_final);
         //print_float(curctx->active_evt->V_min);
         PRINTF("\r\n");
@@ -127,7 +106,6 @@ void scheduler(void) {
       case TASK:
       case SLEEPING:
       case CHARGING:
-        PRINTF("not event! %x\r\n",curctx->active_task);
         PRINTF("\tnot event! %x\r\n",ticks_waited);
         curctx->mode = CHARGING;
         break;
@@ -201,7 +179,7 @@ void scheduler(void) {
     LFCN_DBG_PRINTF("Pick task? %u\r\n",tasks_ok);
     // First set up timers to wait for an event
     ticks_to_wait = get_next_evt_time();
-    //LFCN_DBG_PRINTF("To wait: %u\r\n",ticks_to_wait);
+    LFCN_DBG_PRINTF("To wait: %u\r\n",ticks_to_wait);
     start_timer(ticks_to_wait);
     // check if we're above
     #ifndef LFCN_CONT_POWER
@@ -224,11 +202,12 @@ void scheduler(void) {
         next->fifo = curctx->fifo;
         next->active_evt = NULL;
         next->mode = TASK;
-        //LFCN_DBG_PRINTF("1mode:%u\r\n",curctx->mode);
+        LFCN_DBG_PRINTF("1mode:%u %u\r\n",curctx->mode,curctx->active_task->valid_chkpt);
         //PRINTF("1mode:%u\r\n",curctx->mode);
         LCFN_INTERRUPTS_ENABLE;
         curctx = next;
         if (next->active_task->valid_chkpt) {
+          BIT_FLIP(1,1);BIT_FLIP(1,5);
           restore_vol(); // Jump to new task
         }
         else {
@@ -274,18 +253,25 @@ void scheduler(void) {
     BIT_FLIP(1,1);
     SET_MAX_UPPER_COMP(); // Set interrupt when we're fully charged too
     // sleep
+    LFCN_DBG_PRINTF("Sleep\r\n");
+    comp_e_flag = 1; // Flag to get us out
     LCFN_INTERRUPTS_ENABLE;
     //LFCN_DBG_PRINTF("Sleeping for %u = %u",TA0CCR0,ticks_to_wait);
     __disable_interrupt();
-    comp_e_flag = 1; // Flag to get us out
+      BIT_FLIP(1,1);
+      BIT_FLIP(1,1);
     while((TA0CCTL0 & CCIE) && comp_e_flag) {
+      BIT_FLIP(1,1);
+      BIT_FLIP(1,1);
       __bis_SR_register(SLEEP_BITS + GIE);
+      BIT_FLIP(1,1);
+      BIT_FLIP(1,1);
       //LFCN_DBG_PRINTF("Woo!\r\n");
       __disable_interrupt();
     }
-    BIT_FLIP(1,1);
-    BIT_FLIP(1,1);
-    //LFCN_DBG_PRINTF("Done?");
+    //BIT_FLIP(1,1);
+    //BIT_FLIP(1,1);
+    LFCN_DBG_PRINTF("Wake\r\n");
     #ifdef CATNAP_FEASIBILITY
     if (curctx->mode != TASK) {
       v_charge_end = turn_on_read_adc(SCALER);
@@ -314,8 +300,8 @@ __attribute__ ((interrupt(COMP_E_VECTOR)))
 void COMP_VBANK_ISR (void) {
   BIT_FLIP(1,4);
   BIT_FLIP(1,4);
+  store = CEINT;
   if (CEINT | CERDYIFG) {
-    store = CECTL2;
     if (!(CEINT & CEIFG) && !(CEINT & CEIIFG)) {
       BIT_FLIP(1,4);
       BIT_FLIP(1,4);
@@ -336,7 +322,7 @@ void COMP_VBANK_ISR (void) {
   //COMP_VBANK(INT) &= ~(COMP_VBANK(IE) | COMP_VBANK(IIE));
   //COMP_VBANK(CTL1) &= ~COMP_VBANK(ON);
   DISABLE_LFCN_TIMER;// Just in case
-  //PRINTF("in comp %x,\r\n",store);
+  LFCN_DBG_PRINTF("in comp %x,\r\n",store);
   //PRINTF("in comp %x, %x, %x\r\n",CECTL2,CECTL1,CECTL0);
   //CEINT = ~(CEIFG | CEIIFG);
   volatile int chkpt_flag = 0;
@@ -381,6 +367,10 @@ void COMP_VBANK_ISR (void) {
         LFCN_DBG_PRINTF("Mode: %u\r\n",curctx->mode);
         return; // If we're not in a task just return w/out a checkpoint
       }
+      if (curctx->active_task->valid_chkpt) {
+        LFCN_DBG_PRINTF("Saving us!!\r\n");
+        return;
+      }
       volatile int chkpt_flag;
       chkpt_flag = 0;
       LFCN_DBG_PRINTF("Chkpt2!\r\n");
@@ -397,13 +387,17 @@ void COMP_VBANK_ISR (void) {
         );
       }
       else {
-        LFCN_DBG_PRINTF("Ret2\r\n");
+        CEINT = 0;
+        BIT_FLIP(1,5);
+        BIT_FLIP(1,1);
+        LFCN_DBG_PRINTF("Ret2 from chkpt %x\r\n",curctx->active_task);
+        curctx->active_task->valid_chkpt = 0;
       }
     }
   }
   else {/*Charged to max*/
     /* allow tasks again */ 
-    // SWitch to worrying about the minimum
+    // Switch to worrying about the minimum
     LFCN_DBG_PRINTF("Set min! %x\r\n",LEVEL_MASK & CECTL2);
     SET_LOWER_COMP(DEFAULT_MIN_THRES);
     ticks_waited = TA0R;
@@ -411,8 +405,11 @@ void COMP_VBANK_ISR (void) {
     comp_e_flag = 0;
     tasks_ok = 1;
   }
+  BIT_FLIP(1,5);
+  BIT_FLIP(1,5);
   COMP_VBANK(INT) |= COMP_VBANK(IE);
   ENABLE_LFCN_TIMER;// Just in case
+  LFCN_DBG_PRINTF("here\r\n");
 }
 
 #ifndef GDB_INT_CFG
@@ -435,6 +432,10 @@ timerISRHandler(void) {
   //PRINTF("timera0 %u\r\n",(TA0CCTL0 & CCIE));
   if ( curctx->mode == TASK) {
     LFCN_DBG_PRINTF("Chkpt3! %u\r\n",curctx->active_task->valid_chkpt);
+    if (curctx->active_task->valid_chkpt) {
+      LFCN_DBG_PRINTF("Saving us timer\r\n");
+      return;
+    }
     volatile int chkpt_flag = 0;
     BIT_FLIP(1,5);
     checkpoint();
@@ -447,7 +448,11 @@ timerISRHandler(void) {
           : [nt] "r" (&scheduler)
       );
     }
-    LFCN_DBG_PRINTF("Ret3\r\n");
+    BIT_FLIP(1,5);
+    BIT_FLIP(1,5);
+    BIT_FLIP(1,1);
+    LFCN_DBG_PRINTF("Ret3 from chkpt\r\n");
+    curctx->active_task->valid_chkpt = 0;
     return;
   }
   BIT_FLIP(1,5);

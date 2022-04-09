@@ -1,4 +1,5 @@
 #include "catnap.h"
+#include "print_util.h"
 #include "culpeo.h"
 #include "scheduler.h"
 #include "comp.h"
@@ -27,7 +28,7 @@ void update_comp()
     //PRINTF("e: %x, energy: %u\r\n",i,e->energy);
 		worst_case_energy += e->energy * e->burst_num;
 	}
-  lower_thres = energy_to_volt(worst_case_energy);
+  lower_thres = energy_to_volt(worst_case_energy) + 5;
   //TODO poorly named... this should be upper_thres
   max_thres = lower_thres + 10; //TODO can't tolerate V resolution changes
   if (max_thres >= NUM_LEVEL) {
@@ -35,7 +36,7 @@ void update_comp()
     while(1);
   }
   event_threshold = thresh_to_voltage(lower_thres);
-  PRINTF("|%u %u %u:thresholds\r\n",lower_thres,max_thres,event_threshold);
+  LFCN_DBG_PRINTF("|%u %u %u:thresholds\r\n",lower_thres,max_thres,event_threshold);
 	//PRINTF("Budget: %x %x\r\n", (unsigned)(energy_budget >> 16),
   //(unsigned)(energy_budget & 0xFFFF));
 	//PRINTF("Worst: %x %x\r\n", (unsigned)(worst_case_energy >> 16),
@@ -66,8 +67,8 @@ void calculate_energy_use(evt_t* e, unsigned v_before_event,
       //e->reservedE[i] = used_E;
       e->energy = used_E;
       glob_sqrt = used_E + V_OFF_SQUARED ;
-      e->V_safe = local_sqrt();
-      //PRINTF("V_safe is:");
+      e->V_safe = (uint16_t)local_sqrt();
+      LFCN_DBG_PRINTF("V_safe is:");
       print_float(e->V_safe);
 		//}
 		update_comp();

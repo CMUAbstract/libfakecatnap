@@ -1,4 +1,5 @@
 #include "catnap.h"
+#include "print_util.h"
 #include <stdio.h>
 #include <libio/console.h>
 
@@ -46,7 +47,7 @@ void update_event_timers(uint16_t ticks) {
       }
       // Set ready bits
       if (buffer.time_rdy <= 0) {
-        PRINTF("Rdy %u! %x\r\n",timer_i,temp_event);
+        LFCN_DBG_PRINTF("Rdy %u! %x\r\n",timer_i,temp_event);
         buffer.valid = RDY;
       }
       buffer_done = 1;
@@ -62,7 +63,7 @@ void update_event_timers(uint16_t ticks) {
 
 //Idempotent
 uint16_t get_next_evt_time(void) {
-  uint16_t min_time = 0x7fff;
+  uint16_t min_time = 0xffff;
   int16_t temp_time;
   for (int i = 0; i < MAX_EVENTS; i++) {
     if (all_events.events[i] == 0) {
@@ -75,6 +76,9 @@ uint16_t get_next_evt_time(void) {
     if (temp_time > 0 && temp_time < min_time) {
       min_time = (uint16_t) temp_time;
     }
+  }
+  if (min_time == 0xffff) {
+    min_time = 0;
   }
   return min_time;
 }

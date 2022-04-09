@@ -26,7 +26,7 @@ typedef struct evt_ {
   evt_valid_t valid;
   uint16_t period;
   uint8_t periodic;
-  float V_safe;
+  uint16_t V_safe;
   float V_final;
   float V_min;
 } evt_t;

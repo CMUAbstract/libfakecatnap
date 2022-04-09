@@ -1,6 +1,8 @@
 #include "catnap.h"
 #include "culpeo.h"
+#include "comp.h"
 #include "hw.h"
+#include "print_util.h"
 #include <msp430.h>
 #include <stdio.h>
 #include <math.h>
@@ -53,10 +55,13 @@ void print_float(float f)
 
 
 culpeo_V_t calc_culpeo_vsafe(void) {
-  PRINTF("Calc_vsafe:");
+  //PRINTF("Calc_vsafe:");
   print_float(Vfinal);
   print_float(Vmin);
   float Vd = Vfinal - Vmin;
+  if (Vd < 0) {
+    Vd = 0;
+  }
   float scale = Vmin*(m_float*Vmin + b_float);
   scale /= Vd_const_float;
   float Vd_scaled = Vd*scale;
@@ -71,9 +76,21 @@ culpeo_V_t calc_culpeo_vsafe(void) {
   print_float(Ve+Vd_scaled);
   culpeo_V_t ve_int = cast_out(Ve);
   culpeo_V_t vd_int = cast_out(Vd_scaled);
-  PRINTF("Ve: %u, Vd: %u\r\n",ve_int,vd_int);
+  LFCN_DBG_PRINTF("Ve: %u, Vd: %u\r\n",ve_int,vd_int);
   uint16_t Vsafe = ve_int + vd_int;
   return Vsafe;
+}
+
+unsigned voltage_to_thresh(uint16_t volt) {
+  unsigned val;
+  if (SCALER == 100) {
+    val = (volt - 140)/2;
+  }
+  else { //SCALER == 1000
+    val = (volt - 1400)/20;
+    LFCN_DBG_PRINTF("volt: %u val:%u\r\n",volt,val);
+  }
+  return val;
 }
 
 culpeo_V_t calc_culpeo_bucket(void) {
@@ -84,32 +101,42 @@ culpeo_V_t calc_culpeo_bucket(void) {
   //TODO reorder these
   for (int i = 0; i < MAX_EVENTS; i++) {
 		evt_t* e = all_events.events[i];
-    if ( e == NULL || e->valid == OFF) {
+    if ( e == NULL || e->valid == OFF || e->V_final == 0) {
       continue;
     }
     for (int j = 0; j < e->burst_num; j++) {
-      /*PRINTF("0Bucket:");
-      print_float(Vbucket);
-      PRINTF("\r\n");*/
+      LFCN_DBG_PRINTF("0Bucket:");
+      print_float(e->V_final);
+      print_float(e->V_min);
+      LFCN_DBG_PRINTF("\r\n");
       if ((Vbucket - (e->V_final - e->V_min)) < V_off_float) {
         Vbucket = V_off_float + (e->V_final - e->V_min);
         //PRINTF("inner mod\r\n");
       }
-      /*PRINTF("1Bucket:");
-      print_float(Vbucket);
-      PRINTF("\r\n");*/
       //TODO we could optimize and add another variable to store Vbucket_sq since
       //we get it for free
       float Vbucket_sq;
       Vbucket_sq = V_start_sq_float - e->V_final*e->V_final + Vbucket*Vbucket;
       glob_sqrt = Vbucket_sq;
       Vbucket = local_sqrt();
-      /*PRINTF("Bucket:");
-      print_float(Vbucket);
-      PRINTF("\r\n");*/
     }
   }
+  LFCN_DBG_PRINTF("Bucket:");
+  print_float(Vbucket);
+  LFCN_DBG_PRINTF("\r\n");
   culpeo_V_t Vb = cast_out(Vbucket);
+  if (Vb < 1650) {
+    Vb = 1650;
+  }
+  lower_thres = voltage_to_thresh(Vb)+5;
+  max_thres = lower_thres + 10;
+  if (max_thres >= NUM_LEVEL) {
+    PRINTF("Error! max thres too high %u\r\n",max_thres);
+    while(1);
+  }
+  event_threshold = Vb;
+  LFCN_DBG_PRINTF("|%u %u %u:thresholds\r\n",lower_thres,max_thres,event_threshold);
+
   return Vb;
 }
 
@@ -255,7 +282,8 @@ int profile_cleanup(evt_t *ev) {
   BIT_FLIP(1,5);
   __delay_cycles(800000);//100ms
   uint16_t temp = read_adc();
-  CULPEO_ADC_FULLY_OFF;
+  //CULPEO_ADC_FULLY_OFF;
+  CULPEO_ADC_DISABLE;
   BIT_FLIP(1,5);
   // Re-enable incoming power
   //P1OUT &= ~BIT1;
@@ -267,7 +295,8 @@ int profile_cleanup(evt_t *ev) {
   ev->V_min = Vmin;
   ev->V_final = Vfinal;
   culpeo_profiling_flag = 0;
-  CULPEO_ADC_DISABLE;
+  //CULPEO_ADC_DISABLE;
+  return 0;
 }
 
 void __attribute__((interrupt(TIMER1_A0_VECTOR)))

@@ -28,6 +28,10 @@ extern volatile uint8_t  ISR_DISABLE;
   TA0CCTL0 &= ~CCIE; \
   ISR_DISABLE = 1; \
 
+#define LCFN_INTERRUPTS_INTERNAL_DISABLE \
+  TA0CCTL0 &= ~CCIE; \
+  CEINT &= ~(CEIE | CEIIE | CERDYIE);
+
 
 #ifndef LFCN_CONT_POWER
 
