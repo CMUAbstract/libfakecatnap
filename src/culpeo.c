@@ -56,8 +56,8 @@ void print_float(float f)
 
 culpeo_V_t calc_culpeo_vsafe(void) {
   //PRINTF("Calc_vsafe:");
-  print_float(Vfinal);
-  print_float(Vmin);
+  //print_float(Vfinal);
+  //print_float(Vmin);
   float Vd = Vfinal - Vmin;
   if (Vd < 0) {
     Vd = 0;
@@ -65,7 +65,7 @@ culpeo_V_t calc_culpeo_vsafe(void) {
   float scale = Vmin*(m_float*Vmin + b_float);
   scale /= Vd_const_float;
   float Vd_scaled = Vd*scale;
-  scale = 1- Vd_scaled;
+  // scale = 1- Vd_scaled;
   //print_float(scale);
   float Ve_squared = Vs_const_float + Voff_sq_float;
   float temp = Vfinal*Vfinal;
@@ -73,7 +73,7 @@ culpeo_V_t calc_culpeo_vsafe(void) {
   Ve_squared -= temp;
   glob_sqrt = Ve_squared;
   float Ve = local_sqrt();
-  print_float(Ve+Vd_scaled);
+  //print_float(Ve+Vd_scaled);
   culpeo_V_t ve_int = cast_out(Ve);
   culpeo_V_t vd_int = cast_out(Vd_scaled);
   LFCN_DBG_PRINTF("Ve: %u, Vd: %u\r\n",ve_int,vd_int);
@@ -106,8 +106,10 @@ culpeo_V_t calc_culpeo_bucket(void) {
     }
     for (int j = 0; j < e->burst_num; j++) {
       LFCN_DBG_PRINTF("0Bucket:");
+      #ifdef LFCN_DBG
       print_float(e->V_final);
       print_float(e->V_min);
+      #endif
       LFCN_DBG_PRINTF("\r\n");
       if ((Vbucket - (e->V_final - e->V_min)) < V_off_float) {
         Vbucket = V_off_float + (e->V_final - e->V_min);
@@ -121,15 +123,22 @@ culpeo_V_t calc_culpeo_bucket(void) {
       Vbucket = local_sqrt();
     }
   }
-  LFCN_DBG_PRINTF("Bucket:");
-  print_float(Vbucket);
-  LFCN_DBG_PRINTF("\r\n");
   culpeo_V_t Vb = cast_out(Vbucket);
+  for (int i = 0; i < MAX_EVENTS; i++) {
+		evt_t* e = all_events.events[i];
+    if ( e == NULL || e->valid == OFF || e->V_final == 0) {
+      continue;
+    }
+    if (Vb < e->V_safe) {
+      Vb = e->V_safe;
+    }
+  }
+  LFCN_DBG_PRINTF("Bucket:",Vb);
   if (Vb < 1650) {
     Vb = 1650;
   }
-  lower_thres = voltage_to_thresh(Vb)+5;
-  max_thres = lower_thres + 10;
+  lower_thres = voltage_to_thresh(Vb); //Should roughly even up the comp and adc
+  max_thres = lower_thres + 5; //Corresponds to ~.1V
   if (max_thres >= NUM_LEVEL) {
     PRINTF("Error! max thres too high %u\r\n",max_thres);
     while(1);

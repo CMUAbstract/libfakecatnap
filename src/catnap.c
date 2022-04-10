@@ -71,7 +71,9 @@ int main(void) {
   if (first_boot != MAGIC_NUMBER) {
     add_event(&EVT_FCN_STARTER);
     first_boot = MAGIC_NUMBER;
+#ifndef LFCN_CONT_POWER
     capybara_shutdown();
+#endif
   }
   // Clear a couple variables after a reboot
   vfinal = 0;
@@ -122,8 +124,8 @@ void scheduler(void) {
     ticks_waited = 0;
     // Schedule something next
     evt_t * nextE = pick_event();
-      /*PRINTF("post pick %x ",curctx->active_evt);
-      print_float(curctx->active_evt->V_final);
+    LFCN_DBG_PRINTF("post pick %x \r\n",curctx->active_evt);
+      /*print_float(curctx->active_evt->V_final);
       print_float(curctx->active_evt->V_min);
       PRINTF("\r\n");*/
     // If event, measure vcap
@@ -143,6 +145,11 @@ void scheduler(void) {
       //TODO this needs to be more intelligent
       nextE->V_final = 2.258;
       nextE->V_min = 2.128;
+      Vmin = nextE->V_min;
+      Vfinal = nextE->V_final;
+      nextE->V_safe = calc_culpeo_vsafe();
+      PRINTF("Vsafe: ");
+      print_float(nextE->V_safe);
       #endif//PROF_DISABLE
       #endif//CATNAP_FEASIBILITY
       //TODO streamline the number of adc reads
@@ -176,7 +183,6 @@ void scheduler(void) {
         tasks_ok = 0; // No tasks for now
       }
     }
-    LFCN_DBG_PRINTF("Pick task? %u\r\n",tasks_ok);
     // First set up timers to wait for an event
     ticks_to_wait = get_next_evt_time();
     LFCN_DBG_PRINTF("To wait: %u\r\n",ticks_to_wait);
@@ -191,6 +197,7 @@ void scheduler(void) {
     BIT_FLIP(1,5);
     BIT_FLIP(1,5);
     BIT_FLIP(1,5);
+    LFCN_DBG_PRINTF("Pick task? %u %u %u\r\n",tasks_ok,temp,event_threshold);
     if (temp > event_threshold && tasks_ok) { // Only pick a task if we're above the thresh
       LFCN_DBG_PRINTF("Set thresh %u, lvl %u\r\n",event_threshold,lower_thres);
       SET_LOWER_COMP(lower_thres); // Interrupt if we got below event thresh

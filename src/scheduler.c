@@ -28,9 +28,9 @@ void update_comp()
     //PRINTF("e: %x, energy: %u\r\n",i,e->energy);
 		worst_case_energy += e->energy * e->burst_num;
 	}
-  lower_thres = energy_to_volt(worst_case_energy) + 5;
+  lower_thres = energy_to_volt(worst_case_energy);
   //TODO poorly named... this should be upper_thres
-  max_thres = lower_thres + 10; //TODO can't tolerate V resolution changes
+  max_thres = lower_thres + 5; //TODO can't tolerate V resolution changes
   if (max_thres >= NUM_LEVEL) {
     PRINTF("Error! max thres too high\r\n");
     while(1);
