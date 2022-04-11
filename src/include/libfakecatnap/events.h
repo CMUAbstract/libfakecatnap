@@ -51,4 +51,9 @@ int event_return();
 #define EVENT_RETURN() \
   event_return();
 
+
+#define INT_RETURN \
+  __asm__ volatile ("br %[nt]\n" : : [nt] "r" (&scheduler));
+  
+
 #endif

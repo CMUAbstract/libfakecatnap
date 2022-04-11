@@ -157,6 +157,9 @@ void scheduler(void) {
       // Only run event if it's safe, otherwise charge
       uint16_t V_safe_int = (uint16_t)nextE->V_safe;
       PRINTF("Cur: %u, V_safe=%u\r\n",test,V_safe_int);
+      #ifdef LFCN_CONT_POWER
+      test = V_safe_int + 10;
+      #endif
       if (test > V_safe_int) {
         // Swap context
         context_t *next = (curctx == &context_0 )? &context_1 : &context_0;
@@ -194,9 +197,9 @@ void scheduler(void) {
     uint16_t temp = LFCN_STARTER_THRESH + 10;
     #endif
     //LFCN_DBG_PRINTF("ADC: %u %u %u\r\n",temp,event_threshold,tasks_ok);
-    BIT_FLIP(1,5);
-    BIT_FLIP(1,5);
-    BIT_FLIP(1,5);
+    
+    
+    
     LFCN_DBG_PRINTF("Pick task? %u %u %u\r\n",tasks_ok,temp,event_threshold);
     if (temp > event_threshold && tasks_ok) { // Only pick a task if we're above the thresh
       LFCN_DBG_PRINTF("Set thresh %u, lvl %u\r\n",event_threshold,lower_thres);
@@ -214,7 +217,7 @@ void scheduler(void) {
         LCFN_INTERRUPTS_ENABLE;
         curctx = next;
         if (next->active_task->valid_chkpt) {
-          BIT_FLIP(1,1);BIT_FLIP(1,5);
+          BIT_FLIP(1,1);
           restore_vol(); // Jump to new task
         }
         else {
@@ -320,8 +323,8 @@ void COMP_VBANK_ISR (void) {
   if (ISR_DISABLE) {
     comp_violation = 1;
     CEINT = 0;
-    BIT_FLIP(1,5);
-    BIT_FLIP(1,5);
+    
+    
     return;
   }
   comp_violation = 0;
@@ -395,7 +398,7 @@ void COMP_VBANK_ISR (void) {
       }
       else {
         CEINT = 0;
-        BIT_FLIP(1,5);
+        
         BIT_FLIP(1,1);
         LFCN_DBG_PRINTF("Ret2 from chkpt %x\r\n",curctx->active_task);
         curctx->active_task->valid_chkpt = 0;
@@ -412,8 +415,8 @@ void COMP_VBANK_ISR (void) {
     comp_e_flag = 0;
     tasks_ok = 1;
   }
-  BIT_FLIP(1,5);
-  BIT_FLIP(1,5);
+  
+  
   COMP_VBANK(INT) |= COMP_VBANK(IE);
   ENABLE_LFCN_TIMER;// Just in case
   LFCN_DBG_PRINTF("here\r\n");
@@ -428,10 +431,10 @@ timerISRHandler(void) {
 	CEINT &= ~CEIE; // Disable comp interrupt for our sanity
   //LFCN_DBG_PRINTF("Timer %u\r\n",curctx->mode);
 /*--------------------------------------------------------*/
-  BIT_FLIP(1,5);
-  BIT_FLIP(1,5);
-  BIT_FLIP(1,5);
-  BIT_FLIP(1,5);
+  
+  
+  
+  
   // Record wait time
   ticks_waited = ticks_to_wait;
   TA0R = 0; // Not sure if we need this
@@ -444,7 +447,7 @@ timerISRHandler(void) {
       return;
     }
     volatile int chkpt_flag = 0;
-    BIT_FLIP(1,5);
+    
     checkpoint();
     chkpt_flag = 1;
     // Jump to scheduler
@@ -455,14 +458,14 @@ timerISRHandler(void) {
           : [nt] "r" (&scheduler)
       );
     }
-    BIT_FLIP(1,5);
-    BIT_FLIP(1,5);
+    
+    
     BIT_FLIP(1,1);
     LFCN_DBG_PRINTF("Ret3 from chkpt\r\n");
     curctx->active_task->valid_chkpt = 0;
     return;
   }
-  BIT_FLIP(1,5);
+  
   __bic_SR_register_on_exit(SLEEP_BITS); //wake up
 /*--------------------------------------------------------*/
 #ifndef LFCN_CONT_POWER

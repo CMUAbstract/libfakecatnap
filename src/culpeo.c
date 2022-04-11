@@ -248,10 +248,10 @@ void culpeo_charging(){
     __delay_cycles(8000);
     //PRINTF("Burn!\r\n");
   }
-  BIT_FLIP(1,5);
-  BIT_FLIP(1,5);
-  BIT_FLIP(1,5);
-  BIT_FLIP(1,5);
+  
+  
+  
+  
   adc_reading = 0;
 }
 
@@ -288,12 +288,12 @@ int profile_event(evt_t *ev) {
 int profile_cleanup(evt_t *ev) {
   CULPEO_PROF_TIMER_DISABLE;
   // sleep
-  BIT_FLIP(1,5);
+  
   __delay_cycles(800000);//100ms
   uint16_t temp = read_adc();
   //CULPEO_ADC_FULLY_OFF;
   CULPEO_ADC_DISABLE;
-  BIT_FLIP(1,5);
+  
   // Re-enable incoming power
   //P1OUT &= ~BIT1;
   //__delay_cycles(80);
