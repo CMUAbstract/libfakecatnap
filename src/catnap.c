@@ -249,7 +249,7 @@ void scheduler(void) {
           // No events active either
           ticks_to_wait = DEFAULT_WAIT;//TODO a hack to stop spiraling...
           start_timer(ticks_to_wait);
-          PRINTF("Going to sleep now plz\r\n");
+          LFCN_DBG_PRINTF("Going to sleep now\r\n");
         }
       }
     }
@@ -269,9 +269,10 @@ void scheduler(void) {
     BIT_FLIP(1,1);
     BIT_FLIP(1,1);
     if(curctx->fifo->tsk_cnt == 0 && curctx->active_task == NULL) {
-      PRINTF("Set nothing!\r\n");
+      LFCN_DBG_PRINTF("Set nothing!\r\n");
       //SET_UPPER_COMP(DEFAULT_NEARLY_MAX_THRES);
     } else {
+      LFCN_DBG_PRINTF("Upper thres: %x\r\n",max_thres);
       SET_MAX_UPPER_COMP(); // Set interrupt when we're fully charged too
     }
     // sleep
@@ -335,8 +336,6 @@ void COMP_VBANK_ISR (void) {
   if (ISR_DISABLE) {
     comp_violation = 1;
     CEINT = 0;
-    
-    
     return;
   }
   comp_violation = 0;

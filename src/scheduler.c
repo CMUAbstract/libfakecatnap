@@ -35,7 +35,7 @@ void update_comp()
     PRINTF("Error! max thres too high\r\n");
     while(1);
   }
-  event_threshold = thresh_to_voltage(lower_thres);
+  event_threshold = thresh_to_voltage(lower_thres)-2;
   LFCN_DBG_PRINTF("|%u %u %u:thresholds\r\n",lower_thres,max_thres,event_threshold);
 	//PRINTF("Budget: %x %x\r\n", (unsigned)(energy_budget >> 16),
   //(unsigned)(energy_budget & 0xFFFF));
@@ -70,6 +70,7 @@ void calculate_energy_use(evt_t* e, unsigned v_before_event,
       e->V_safe = (uint16_t)local_sqrt();
       LFCN_DBG_PRINTF("V_safe is:");
       print_float(e->V_safe);
+      LFCN_DBG_PRINTF("from %u %u\r\n",v_before_event, v_after_event);
 		//}
 		update_comp();
 	}
@@ -80,8 +81,8 @@ unsigned calculate_charge_rate(uint16_t t_charge_end, uint16_t t_charge_start)
 	unsigned rate_changed = 0;
 	uint32_t charge_rate;
 
-	//PRINTF("Chrg: vs: %u, ve: %u\r\n", v_charge_start, v_charge_end);
-	//PRINTF("Chrg: Ts: %u, Te: %u\r\n", t_charge_start, t_charge_end);  //PRINTF("IT:%u %u \r\n",cr_window_it, cr_window_ready);
+	LFCN_DBG_PRINTF("Chrg: vs: %u, ve: %u\r\n", v_charge_start, v_charge_end);
+	LFCN_DBG_PRINTF("Chrg: Ts: %u, Te: %u\r\n", t_charge_start, t_charge_end);  //PRINTF("IT:%u %u \r\n",cr_window_it, cr_window_ready);
 	if (!v_charge_start) {
 		goto calculate_charge_rate_cleanup;
 	}
@@ -98,18 +99,18 @@ unsigned calculate_charge_rate(uint16_t t_charge_end, uint16_t t_charge_start)
 	// Thus, it may look like it is not charging properly
 	// We consider this case as "LARGE INCOMING ENERGY!"
 	if (v_charge_end >= V_NEARLY_MAX) {
-		//PRINTF("I think we have high power\r\n");
+		LFCN_DBG_PRINTF("I think we have high power\r\n");
 		charge_rate = 1000;
 	} else {
 	// if less than 0.05V diff, do not use the result
 		if (v_charge_start + V_THRES >= v_charge_end) {
-			//PRINTF("charge too small\r\n");
+			LFCN_DBG_PRINTF("charge too small\r\n");
 			goto calculate_charge_rate_cleanup;
 		}
 
 		// If too short, it is incorrect
 		if (charge_time < CHARGE_TIME_THRES) {
-			//PRINTF("time too short\r\n");
+			LFCN_DBG_PRINTF("time too short\r\n");
 			goto calculate_charge_rate_cleanup;
 		}
 
@@ -123,7 +124,7 @@ unsigned calculate_charge_rate(uint16_t t_charge_end, uint16_t t_charge_start)
 		// Amp factor to avoid charge_rate being 0
 		charge_rate = AMP_FACTOR * charged_energy / charge_time;
 	}
-  //PRINTF("New chrg_rate:%u %u\r\n", (unsigned)(charge_rate >> 16), (unsigned)(charge_rate & 0xFFFF));
+  LFCN_DBG_PRINTF("New chrg_rate:%u %u\r\n", (unsigned)(charge_rate >> 16), (unsigned)(charge_rate & 0xFFFF));
 	// Push it to averaging window
 	cr_window[cr_window_it] = charge_rate;
 	if (cr_window_it == CR_WINDOW_SIZE - 1) {

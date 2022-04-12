@@ -52,6 +52,7 @@ extern const energy_t level_to_E[NUM_LEVEL];
 	CECTL2 = CERS_2 | level_to_reg[val];\
 	CECTL2 &= ~CERSEL;\
   CECTL1 = CEPWRMD_2 | CEON; \
+	CEINT = 0;\
 	while (!(CEINT & CERDYIFG));/*TODO needs to read from CEINT*/\
 	CEINT = 0;\
 	/*CEINT |= CEIE;*/\
@@ -70,6 +71,7 @@ extern const energy_t level_to_E[NUM_LEVEL];
 	CECTL2 = CERS_2 | level_to_reg[val];\
 	CECTL2 |= CERSEL;\
   CECTL1 = CEPWRMD_2 | CEON; \
+	CEINT = 0;\
 	while (!(CEINT & CERDYIFG));\
 	CEINT = 0;\
 	/*CEINT |= CEIE;*/\
@@ -80,12 +82,13 @@ extern const energy_t level_to_E[NUM_LEVEL];
 
 #define SET_MAX_UPPER_COMP()\
   BIT_FLIP(1,1); BIT_FLIP(1,1);BIT_FLIP(1,1);BIT_FLIP(1,1);\
-	BIT_FLIP(1,5);BIT_FLIP(1,1);BIT_FLIP(1,1);\
+	BIT_FLIP(1,4);BIT_FLIP(1,1);BIT_FLIP(1,1);\
   CECTL0 = CEIPEN | CEIPSEL_13; \
 	CECTL2 = CEREFL_0;\
 	CECTL2 = CERS_2 | level_to_reg[max_thres];\
 	CECTL2 |= CERSEL;\
   CECTL1 = CEPWRMD_2 | CEON; \
+	CEINT = 0;\
 	while (!(CEINT & CERDYIFG));\
 	CEINT &= ~(CEIFG | CEIIFG); \
 	/*CEINT |= CEIE;*/\
