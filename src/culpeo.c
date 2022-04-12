@@ -55,9 +55,9 @@ void print_float(float f)
 
 
 culpeo_V_t calc_culpeo_vsafe(void) {
-  //PRINTF("Calc_vsafe:");
-  //print_float(Vfinal);
-  //print_float(Vmin);
+  PRINTF("Calc_vsafe:");
+  print_float(Vfinal);
+  print_float(Vmin);
   float Vd = Vfinal - Vmin;
   if (Vd < 0) {
     Vd = 0;
@@ -101,7 +101,7 @@ culpeo_V_t calc_culpeo_bucket(void) {
   //TODO reorder these
   for (int i = 0; i < MAX_EVENTS; i++) {
 		evt_t* e = all_events.events[i];
-    if ( e == NULL || e->valid == OFF || e->V_final == 0) {
+    if ( e == NULL || e->V_final == 0 || e == &EVT_FCN_STARTER) {
       continue;
     }
     for (int j = 0; j < e->burst_num; j++) {
@@ -126,7 +126,7 @@ culpeo_V_t calc_culpeo_bucket(void) {
   culpeo_V_t Vb = cast_out(Vbucket);
   for (int i = 0; i < MAX_EVENTS; i++) {
 		evt_t* e = all_events.events[i];
-    if ( e == NULL || e->valid == OFF || e->V_final == 0) {
+    if ( e == NULL || e == &EVT_FCN_STARTER || e->V_final == 0) {
       continue;
     }
     if (Vb < e->V_safe) {
@@ -143,7 +143,7 @@ culpeo_V_t calc_culpeo_bucket(void) {
     PRINTF("Error! max thres too high %u\r\n",max_thres);
     while(1);
   }
-  event_threshold = Vb;
+  event_threshold = Vb - 2;
   LFCN_DBG_PRINTF("|%u %u %u:thresholds\r\n",lower_thres,max_thres,event_threshold);
 
   return Vb;
@@ -184,9 +184,9 @@ do { \
 // Leave in volatile memory
 volatile uint8_t culpeo_profiling_flag = 0;
 
-//Look, this really is intrinsice to the calculations we're doing here. It is
+//Look, this really is intrinsic to the calculations we're doing here. It is
 //customized to the divider, but meh
-#define CULPEO_VHIGH 1865
+#define CULPEO_VHIGH 1930
 
 void culpeo_charging(){ 
   uint16_t adc_reading = 0x00;
@@ -248,10 +248,7 @@ void culpeo_charging(){
     __delay_cycles(8000);
     //PRINTF("Burn!\r\n");
   }
-  
-  
-  
-  
+  LFCN_DBG_PRINTF("Go:%u\r\n",adc_reading);
   adc_reading = 0;
 }
 
@@ -272,9 +269,12 @@ int profile_event(evt_t *ev) {
   context_t *next = (curctx == &context_0 )? &context_1 : &context_0;
   next->active_task = curctx->active_task;
   next->active_evt = ev;
+  next->fifo = curctx->fifo;
   next->mode = EVENT;
   curctx = next;
   PRINTF("Profiling!\r\n");
+  BIT_FLIP(1,4); \
+  BIT_FLIP(1,4); \
   // Jump
   __asm__ volatile ( // volatile because output operands unused by C
       "br %[nt]\n"
@@ -288,18 +288,28 @@ int profile_event(evt_t *ev) {
 int profile_cleanup(evt_t *ev) {
   CULPEO_PROF_TIMER_DISABLE;
   // sleep
-  
-  __delay_cycles(800000);//100ms
-  uint16_t temp = read_adc();
-  //CULPEO_ADC_FULLY_OFF;
+  uint16_t temp;
+  uint16_t max = 0;
+  for(int i =0; i < 5; i++) {
+    __delay_cycles(800000);//100ms
+    //temp = turn_on_read_adc(SCALER);
+    temp = read_adc();
+    LFCN_DBG_PRINTF("%u\r\n",temp);
+    if(temp > max) {
+      max = temp;
+    }
+   }
   CULPEO_ADC_DISABLE;
-  
+  //CULPEO_ADC_FULLY_OFF;
   // Re-enable incoming power
   //P1OUT &= ~BIT1;
   //__delay_cycles(80);
   //P1DIR &= ~BIT1;
+  LFCN_DBG_PRINTF("%u\r\n",temp);
   Vmin = (float)culpeo_min_reading/800.0;
-  Vfinal = (float)temp/800.0;
+  Vfinal = (float)max/800.0;
+  //Vmin = (float)culpeo_min_reading/SCALER;
+  //Vfinal = (float)max/SCALER;
   ev->V_safe = calc_culpeo_vsafe();
   ev->V_min = Vmin;
   ev->V_final = Vfinal;

@@ -97,7 +97,7 @@ void scheduler(void) {
         #else
         vfinal = turn_on_read_adc(SCALER);
         bucket_temp = calc_culpeo_bucket();//TODO only run on changes
-        PRINTF("event! %x ",ticks_waited);
+        PRINTF("event! %x ",curctx->fifo->tsk_cnt);
         //print_float(curctx->active_evt->V_final);
         //print_float(curctx->active_evt->V_min);
         PRINTF("\r\n");
@@ -108,7 +108,7 @@ void scheduler(void) {
       case TASK:
       case SLEEPING:
       case CHARGING:
-        PRINTF("\tnot event! %x\r\n",ticks_waited);
+        PRINTF("\tnot event! %x\r\n",curctx->fifo->tsk_cnt);
         curctx->mode = CHARGING;
         break;
       default:
@@ -164,6 +164,7 @@ void scheduler(void) {
         // Swap context
         context_t *next = (curctx == &context_0 )? &context_1 : &context_0;
         next->active_task = curctx->active_task;
+        next->fifo = curctx->fifo;
         next->active_evt = nextE;
         next->mode = EVENT;
         // enable the absolute lowest threshold so we power off if there's a failure
@@ -197,9 +198,6 @@ void scheduler(void) {
     uint16_t temp = LFCN_STARTER_THRESH + 10;
     #endif
     //LFCN_DBG_PRINTF("ADC: %u %u %u\r\n",temp,event_threshold,tasks_ok);
-    
-    
-    
     LFCN_DBG_PRINTF("Pick task? %u %u %u\r\n",tasks_ok,temp,event_threshold);
     if (temp > event_threshold && tasks_ok) { // Only pick a task if we're above the thresh
       LFCN_DBG_PRINTF("Set thresh %u, lvl %u\r\n",event_threshold,lower_thres);
@@ -236,7 +234,7 @@ void scheduler(void) {
         next->mode = TASK;
         update_task_fifo(next); // Commit changes since we need to wait until the
                                 // task is latched.
-        //LFCN_DBG_PRINTF("mode:%u\r\n",curctx->mode);
+        LFCN_DBG_PRINTF("mode:%u\r\n",curctx->mode);
         LCFN_INTERRUPTS_ENABLE;
         curctx = next;
         __asm__ volatile ( // volatile because output operands unused by C
@@ -244,6 +242,15 @@ void scheduler(void) {
             : /* no outputs */
             : [nt] "r" (curctx->active_task->func)
         );
+      }
+      else {
+      // We only wind up here if there are no active tasks
+        if (ticks_to_wait == 0) {
+          // No events active either
+          ticks_to_wait = DEFAULT_WAIT;//TODO a hack to stop spiraling...
+          start_timer(ticks_to_wait);
+          PRINTF("Going to sleep now plz\r\n");
+        }
       }
     }
     // Got to sleep
@@ -261,7 +268,12 @@ void scheduler(void) {
     BIT_FLIP(1,1);
     BIT_FLIP(1,1);
     BIT_FLIP(1,1);
-    SET_MAX_UPPER_COMP(); // Set interrupt when we're fully charged too
+    if(curctx->fifo->tsk_cnt == 0 && curctx->active_task == NULL) {
+      PRINTF("Set nothing!\r\n");
+      //SET_UPPER_COMP(DEFAULT_NEARLY_MAX_THRES);
+    } else {
+      SET_MAX_UPPER_COMP(); // Set interrupt when we're fully charged too
+    }
     // sleep
     LFCN_DBG_PRINTF("Sleep\r\n");
     comp_e_flag = 1; // Flag to get us out

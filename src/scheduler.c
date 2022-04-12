@@ -22,7 +22,7 @@ void update_comp()
 		// For bursty, this gets a bit conservative
 		evt_t* e = all_events.events[i];
     //if ( e == 0 || e->valid == OFF) {
-    if ( e == 0 ) {
+    if ( e == 0 || e == &EVT_FCN_STARTER) {
       continue;
     }
     //PRINTF("e: %x, energy: %u\r\n",i,e->energy);
@@ -172,7 +172,7 @@ unsigned is_schedulable(uint32_t charge_rate)
 		uint32_t tmp;
 		evt_t* event = all_events.events[i];
     //if (event == NULL || event->valid == OFF) {
-    if (event == NULL) {
+    if (event == NULL || event == &EVT_FCN_STARTER) {
       continue;
     }
 		tmp = event->charge_time * event->burst_num;

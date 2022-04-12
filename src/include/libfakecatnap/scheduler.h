@@ -27,6 +27,9 @@ unsigned thresh_to_voltage(uint8_t index);
 
 #define CR_WINDOW_SIZE 3
 
+//TODO the actual time is related to the timer freq, pull that in too
+#define DEFAULT_WAIT 30000
+
 extern volatile __nv uint32_t cr_window[CR_WINDOW_SIZE];
 extern volatile __nv uint8_t cr_window_it;
 extern volatile __nv uint8_t cr_window_ready;

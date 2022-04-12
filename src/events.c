@@ -14,6 +14,9 @@ int event_return() {
     print_float(evt->V_min);
     print_float(evt->V_final);
     print_float(evt->V_safe);
+    for(int i = 0; i < 2; i++) {
+      __delay_cycles(8000000);
+    }
     capybara_shutdown();
   }
   __asm__ volatile ( // volatile because output operands unused by C

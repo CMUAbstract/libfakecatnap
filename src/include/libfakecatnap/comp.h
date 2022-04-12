@@ -22,7 +22,8 @@
 //#define DEFAULT_MIN_THRES V_1_43
 #define DEFAULT_MIN_THRES V_1_60
 #define DEFAULT_UPPER_THRES V_2_40
-#define DEFAULT_NEARLY_MAX_THRES V_2_40
+//#define DEFAULT_NEARLY_MAX_THRES V_2_40 //works for little caps
+#define DEFAULT_NEARLY_MAX_THRES V_2_48 //works for big caps
 // 0.5865
 #define V_NEARLY_MAX 240
 
