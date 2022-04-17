@@ -14,6 +14,8 @@ uint8_t volatile ISR_DISABLE = 0;
 
 #define MIN_TIME_STEP 10
 
+
+
 #ifndef GDB_INT_CFG
 void start_timer(uint16_t time) {
 	// Set and fire Timer A
@@ -23,6 +25,10 @@ void start_timer(uint16_t time) {
     TA0CCTL0 |= CCIE;
   }
 }
+
+void start_timer_running() {
+  TA0CTL = MC_2 | TASSEL_1 | TACLR |ID_3;
+}
 #else
 void start_timer(uint16_t time) {
 	// Set and fire P1.0
@@ -31,6 +37,10 @@ void start_timer(uint16_t time) {
   P1DIR &= ~BIT0;
   P1IFG = 0;
   P1IE |= BIT0;
+}
+
+void start_timer_running() {
+  TA0CTL = MC_2 | TASSEL_1 | TACLR |ID_3;
 }
 #endif
 
@@ -73,12 +83,13 @@ uint16_t read_adc(void) {
 /* Doesn't assume that adc is set up before reading*/
 uint16_t turn_on_read_adc(uint16_t scaler) {
 	ADC12CTL0 &= ~ADC12ENC;           // Disable conversions
-
+  while(REFCTL0 & REFGENBUSY);            // If ref generator busy, WAIT
+  REFCTL0 |= REFVSEL_2 | REFON;
 	ADC12CTL1 = ADC12SHP; // SAMPCON is sourced from the sampling timer
-	ADC12MCTL0 = ADC12INCH_2; // VR+: VREF, VR- = AVSS, // Channel A15
+	ADC12MCTL0 = ADC12INCH_2 | ADC12VRSEL_1; // VR+: VREF, VR- = AVSS, // Channel A15
 	ADC12CTL0 |= ADC12SHT03 | ADC12ON; // sample and hold time 32 ADC12CLK
 
-	while( REFCTL0 & REFGENBUSY );//TODO can we get rid of reference?
+	//while(!(REFCTL0 & REFGENBUSY));//TODO can we get rid of reference?
 
 	// If this works as I expect,
 	// N = 4096 * (Vin + 0.5*(2.0/4096)) / (2.0) = 4096*Vin/2.0 + 0.5
@@ -102,11 +113,13 @@ uint16_t turn_on_read_adc(uint16_t scaler) {
   // 2.56 is Capy's Vdd
   // The absurdly satisfying simplification is below... You're welcome.
   if (scaler == 100) {
-    output = output >> 3;
+    //output = output >> 3;
+    output = output/8.2;
   }
   else if (scaler == 1000) {
     // With scaler == 1000 we're multiplying by 1.25, so 5/4
-    output = (output * 5) >> 2;
+    //output = (output * 5) >> 2;
+    output = output*1.22;
   }
   // Cheat sheet: 100*Vcap = adc_val/8
 	return (unsigned)output;

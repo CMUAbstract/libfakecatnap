@@ -57,7 +57,6 @@ int main(void) {
   BIT_FLIP(1,1);
   tasks_ok = 1;
   fail_count++;
-  app_hw_init();
   // Init timer
   ENABLE_LFCN_TIMER;
   // Init comparator
@@ -75,6 +74,8 @@ int main(void) {
     capybara_shutdown();
 #endif
   }
+  // Hardware init after STARTER event
+  app_hw_init();
   // Clear a couple variables after a reboot
   vfinal = 0;
   vstart = 0;//TODO should these be NV at all?
@@ -96,7 +97,10 @@ void scheduler(void) {
         PRINTF("event! %u %u\r\n",cr_window_ready,cr_window_it);
         #else
         vfinal = turn_on_read_adc(SCALER);
-        bucket_temp = calc_culpeo_bucket();//TODO only run on changes
+        if (new_event) {
+          bucket_temp = calc_culpeo_bucket();//TODO only run on changes
+          new_event = 0;
+        }
         PRINTF("event! %x ",curctx->fifo->tsk_cnt);
         //print_float(curctx->active_evt->V_final);
         //print_float(curctx->active_evt->V_min);
@@ -124,7 +128,7 @@ void scheduler(void) {
     ticks_waited = 0;
     // Schedule something next
     evt_t * nextE = pick_event();
-    LFCN_DBG_PRINTF("post pick %x \r\n",curctx->active_evt);
+    LFCN_DBG_PRINTF("post pick %x \r\n",curctx->active_evt->valid);
       /*print_float(curctx->active_evt->V_final);
       print_float(curctx->active_evt->V_min);
       PRINTF("\r\n");*/
@@ -185,6 +189,8 @@ void scheduler(void) {
       }
       else {
         tasks_ok = 0; // No tasks for now
+        curctx->active_evt->valid = STARTED;
+        //PRINTF("Setting started!!!\r\n");
       }
     }
     // First set up timers to wait for an event
@@ -255,11 +261,19 @@ void scheduler(void) {
     }
     // Got to sleep
     curctx->mode = SLEEPING;
+    if ((TA0CTL & MC) == MC_0) {
+      start_timer_running();//Start timer if it's not on
+      LFCN_DBG_PRINTF("backup timer on!\r\n");
+    }
+    else {
+      LFCN_DBG_PRINTF("Ta0ctl:%x\r\n",TA0CTL);
+    }
     // Grab starting voltage if we're sleeping
     #ifdef CATNAP_FEASIBILITY
     if (curctx->mode != TASK) {
       v_charge_start = turn_on_read_adc(SCALER);
       t_start = TA0R;//TODO is the timer running here?
+      LFCN_DBG_PRINTF("Ta0r: %x\r\n",TA0R);
       //BIT_FLIP(3,5);
     }
     #endif
@@ -300,9 +314,11 @@ void scheduler(void) {
       v_charge_end = turn_on_read_adc(SCALER);
       if (!comp_e_flag) {
         t_end = TA0R;//we were woken up by the comparator
+        LFCN_DBG_PRINTF("after sleep! %x\r\n",TA0R);
       }
       else {
         t_end = ticks_waited - t_start; //woken up by timer which clobbered ta0r
+        LFCN_DBG_PRINTF("after sleep timer! %x %x %x\r\n",t_end,ticks_waited,t_start);
       }
       calculate_charge_rate(t_end,t_start);
       //PRINTF("Got t_end!\r\n");
@@ -321,13 +337,13 @@ uint16_t store = 0;
 
 __attribute__ ((interrupt(COMP_E_VECTOR)))
 void COMP_VBANK_ISR (void) {
-  BIT_FLIP(1,4);
-  BIT_FLIP(1,4);
+  BIT_FLIP(1,1);
+  BIT_FLIP(1,1);
   store = CEINT;
   if (CEINT | CERDYIFG) {
     if (!(CEINT & CEIFG) && !(CEINT & CEIIFG)) {
-      BIT_FLIP(1,4);
-      BIT_FLIP(1,4);
+      BIT_FLIP(1,1);
+      BIT_FLIP(1,1);
       CEINT &= ~(CERDYIFG | CERDYIE);
       return;
     }
@@ -426,8 +442,6 @@ void COMP_VBANK_ISR (void) {
     comp_e_flag = 0;
     tasks_ok = 1;
   }
-  
-  
   COMP_VBANK(INT) |= COMP_VBANK(IE);
   ENABLE_LFCN_TIMER;// Just in case
   LFCN_DBG_PRINTF("here\r\n");
@@ -442,10 +456,6 @@ timerISRHandler(void) {
 	CEINT &= ~CEIE; // Disable comp interrupt for our sanity
   //LFCN_DBG_PRINTF("Timer %u\r\n",curctx->mode);
 /*--------------------------------------------------------*/
-  
-  
-  
-  
   // Record wait time
   ticks_waited = ticks_to_wait;
   TA0R = 0; // Not sure if we need this
@@ -458,7 +468,6 @@ timerISRHandler(void) {
       return;
     }
     volatile int chkpt_flag = 0;
-    
     checkpoint();
     chkpt_flag = 1;
     // Jump to scheduler
@@ -469,14 +478,11 @@ timerISRHandler(void) {
           : [nt] "r" (&scheduler)
       );
     }
-    
-    
     BIT_FLIP(1,1);
     LFCN_DBG_PRINTF("Ret3 from chkpt\r\n");
     curctx->active_task->valid_chkpt = 0;
     return;
   }
-  
   __bic_SR_register_on_exit(SLEEP_BITS); //wake up
 /*--------------------------------------------------------*/
 #ifndef LFCN_CONT_POWER

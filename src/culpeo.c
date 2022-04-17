@@ -16,6 +16,7 @@
 __nv float Vmin = 2.103;
 __nv float Vfinal = 2.238;
 __nv float glob_sqrt = .5;
+__nv uint8_t new_event = 0;
 
 uint16_t culpeo_min_reading = 0xff;
 
@@ -98,8 +99,7 @@ culpeo_V_t calc_culpeo_bucket(void) {
   // Assume they're in order?
   // Start by setting bucket level to Voff
   float Vbucket = V_off_float;
-  //TODO reorder these
-  for (int i = 0; i < MAX_EVENTS; i++) {
+  for (int i = MAX_EVENTS - 1; i >= 0; i--) {
 		evt_t* e = all_events.events[i];
     if ( e == NULL || e->V_final == 0 || e == &EVT_FCN_STARTER) {
       continue;
@@ -133,7 +133,7 @@ culpeo_V_t calc_culpeo_bucket(void) {
       Vb = e->V_safe;
     }
   }
-  LFCN_DBG_PRINTF("Bucket:",Vb);
+  LFCN_DBG_PRINTF("Bucket: %u",Vb);
   if (Vb < 1650) {
     Vb = 1650;
   }
@@ -163,7 +163,8 @@ do { \
   }while(0);
 
 #define CULPEO_ADC_DISABLE \
-		ADC12CTL0 &= ~(ADC12ENC | ADC12ON);
+		ADC12CTL0 &= ~(ADC12ENC | ADC12ON);\
+    REFCTL0 &= ~REFON;
 
 #define CULPEO_ADC_FULLY_OFF \
   ADC12CTL0 = 0;\
@@ -195,10 +196,14 @@ void culpeo_charging(){
   P1SEL0 |= BIT2;
   PRINTF("Charging!\r\n");
   ADC12CTL0 &= ~ADC12ENC;           // Disable ADC
+
+  while(REFCTL0 & REFGENBUSY);            // If ref generator busy, WAIT
+  REFCTL0 |= REFVSEL_2 | REFON;
+
   ADC12CTL0 = ADC12SHT0_2 | ADC12ON;      // Sampling time, S&H=16, ADC12 on
   ADC12CTL1 = ADC12SHP;                   // Use sampling timer
   ADC12CTL2 = ADC12RES_2;                // 12-bit conversion results
-  ADC12MCTL0 = ADC12INCH_2; // A2 ADC input select; VR=Vdd
+  ADC12MCTL0 = ADC12INCH_2 | ADC12VRSEL_1; // A2 ADC input select; VR=Vdd
   ADC12IER0 &= ~ADC12IE0;                  // Disable ADC conv complete interrupt
   __delay_cycles(10000);
   int count = 0;
@@ -249,10 +254,11 @@ void culpeo_charging(){
     //PRINTF("Burn!\r\n");
   }
   LFCN_DBG_PRINTF("Go:%u\r\n",adc_reading);
+  //ADC12CTL0 &= ~(ADC12ON);
+  //REFTCL0 &= ~REFON;
+  // Leave on for profiling
   adc_reading = 0;
 }
-
-
 
 
 int profile_event(evt_t *ev) {
@@ -260,8 +266,13 @@ int profile_event(evt_t *ev) {
   LCFN_INTERRUPTS_DISABLE;
   // Charge up to 2.4V
   culpeo_charging();
+  if (!ev->no_profile) {
   // Start our timer
-  CULPEO_PROF_TIMER_ENABLE;
+    CULPEO_PROF_TIMER_ENABLE;
+  }
+  else {
+    //Turn off adc
+  }
   // Set flag, set min
   culpeo_min_reading = 0xffff;
   culpeo_profiling_flag = 1;
@@ -273,8 +284,8 @@ int profile_event(evt_t *ev) {
   next->mode = EVENT;
   curctx = next;
   PRINTF("Profiling!\r\n");
-  BIT_FLIP(1,4); \
-  BIT_FLIP(1,4); \
+  BIT_FLIP(1,1); \
+  BIT_FLIP(1,1); \
   // Jump
   __asm__ volatile ( // volatile because output operands unused by C
       "br %[nt]\n"
@@ -290,6 +301,20 @@ int profile_cleanup(evt_t *ev) {
   // sleep
   uint16_t temp;
   uint16_t max = 0;
+  if (ev->no_profile) {
+    // Catch min now
+    ADC12CTL0 &= ~ADC12ENC;           // Disable ADC
+
+    while(REFCTL0 & REFGENBUSY);            // If ref generator busy, WAIT
+    REFCTL0 |= REFVSEL_2 | REFON;
+
+    ADC12CTL0 = ADC12SHT0_2 | ADC12ON;      // Sampling time, S&H=16, ADC12 on
+    ADC12CTL1 = ADC12SHP;                   // Use sampling timer
+    ADC12CTL2 = ADC12RES_2;                // 12-bit conversion results
+    ADC12MCTL0 = ADC12INCH_2 | ADC12VRSEL_1; // A2 ADC input select; VR=Vdd
+    ADC12IER0 &= ~ADC12IE0;                  // Disable ADC conv complete interrupt
+    culpeo_min_reading = read_adc();
+  }
   for(int i =0; i < 5; i++) {
     __delay_cycles(800000);//100ms
     //temp = turn_on_read_adc(SCALER);
@@ -298,7 +323,7 @@ int profile_cleanup(evt_t *ev) {
     if(temp > max) {
       max = temp;
     }
-   }
+  }
   CULPEO_ADC_DISABLE;
   //CULPEO_ADC_FULLY_OFF;
   // Re-enable incoming power
@@ -306,13 +331,14 @@ int profile_cleanup(evt_t *ev) {
   //__delay_cycles(80);
   //P1DIR &= ~BIT1;
   LFCN_DBG_PRINTF("%u\r\n",temp);
-  Vmin = (float)culpeo_min_reading/800.0;
-  Vfinal = (float)max/800.0;
+  Vmin = (float)culpeo_min_reading/820.0;
+  Vfinal = (float)max/820.0;
   //Vmin = (float)culpeo_min_reading/SCALER;
   //Vfinal = (float)max/SCALER;
   ev->V_safe = calc_culpeo_vsafe();
   ev->V_min = Vmin;
   ev->V_final = Vfinal;
+  new_event = 1;
   culpeo_profiling_flag = 0;
   //CULPEO_ADC_DISABLE;
   return 0;
@@ -322,7 +348,6 @@ void __attribute__((interrupt(TIMER1_A0_VECTOR)))
 timerA1ISRHandler(void) {
     uint16_t val;
     //PRINTF("ms timer\r\n");
-    BIT_FLIP(1,1);
     TA1R = 0;
     val = read_adc();
     if (culpeo_min_reading > val) {

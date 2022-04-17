@@ -20,7 +20,10 @@
 //#define DEFAULT_MIN_THRES V_1_78
 
 //#define DEFAULT_MIN_THRES V_1_43
-#define DEFAULT_MIN_THRES V_1_60
+//#define DEFAULT_MIN_THRES V_1_56 //works for periodic sensing & send
+#define DEFAULT_MIN_THRES V_1_50 //works for low power sensing & send
+#define DEFAULT_MIN_THRES_CALC V_1_60
+#define DEFAULT_MIN_TASK_THRESH V_1_64
 #define DEFAULT_UPPER_THRES V_2_40
 //#define DEFAULT_NEARLY_MAX_THRES V_2_40 //works for little caps
 #define DEFAULT_NEARLY_MAX_THRES V_2_48 //works for big caps
@@ -82,7 +85,7 @@ extern const energy_t level_to_E[NUM_LEVEL];
 
 #define SET_MAX_UPPER_COMP()\
   BIT_FLIP(1,1); BIT_FLIP(1,1);BIT_FLIP(1,1);BIT_FLIP(1,1);\
-	BIT_FLIP(1,4);BIT_FLIP(1,1);BIT_FLIP(1,1);\
+	BIT_FLIP(1,1);BIT_FLIP(1,1);BIT_FLIP(1,1);\
   CECTL0 = CEIPEN | CEIPSEL_13; \
 	CECTL2 = CEREFL_0;\
 	CECTL2 = CERS_2 | level_to_reg[max_thres];\

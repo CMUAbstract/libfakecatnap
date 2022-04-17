@@ -39,12 +39,22 @@ int dec_event(evt_t *event) {
 
 
 evt_t * pick_event() {
+  evt_t * next_e = NULL;
   for (int i = 0; i < MAX_EVENTS; i++) {
+    if (all_events.events[i] == 0) {
+      continue;
+    }
+    if (all_events.events[i]->valid == STARTED) {
+      //PRINTF("Got started!!!!\r\n");
+      next_e = all_events.events[i];
+      return next_e;
+    }
     if (all_events.events[i]->valid == RDY) {
-      return all_events.events[i];
+      next_e = all_events.events[i];
+      //return all_events.events[i];
     }
   }
-  return NULL;
+  return next_e;
 }
 
 void dump_events() {

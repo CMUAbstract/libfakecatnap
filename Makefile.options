@@ -7,6 +7,10 @@ ifeq ($(CULPEO_PROF_DISABLE),1)
 LOCAL_CFLAGS += -DCULPEO_PROF_DISABLE
 endif
 
+ifeq ($(CATNAP_DISABLE_RECALC),1)
+LOCAL_CFLAGS += -DCATNAP_DISABLE_RECALC
+endif
+
 
 # 2.0V, (2.0*100) and our alg takes care of it
 ifeq ($(CATNAP_FEASIBILITY),0)

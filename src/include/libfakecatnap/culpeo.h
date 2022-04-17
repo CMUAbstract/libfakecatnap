@@ -1,6 +1,8 @@
 #ifndef _LCFN_CULPEO_H_
 #define _LCFN_CULPEO_H_
 
+#include <libmsp/mem.h>
+
 extern __nv float Vmin;
 extern __nv float Vfinal;
 extern __nv float glob_sqrt;

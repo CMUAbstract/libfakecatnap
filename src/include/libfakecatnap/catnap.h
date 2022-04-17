@@ -91,6 +91,8 @@ extern __nv task_fifo_t all_tasks;
 extern volatile  __nv uint16_t ticks_waited;
 extern volatile uint16_t ticks_to_wait;
 
+extern __nv uint8_t new_event;
+
 void app_hw_init(void);
 
 int main(void);

@@ -69,6 +69,9 @@ uint16_t get_next_evt_time(void) {
     if (all_events.events[i] == 0) {
       continue;
     }
+    if (all_events.events[i]->valid == STARTED) {
+      return 0;
+    }
     if (all_events.events[i]->valid != WAITING) {
       continue;
     }

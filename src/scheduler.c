@@ -25,10 +25,14 @@ void update_comp()
     if ( e == 0 || e == &EVT_FCN_STARTER) {
       continue;
     }
-    //PRINTF("e: %x, energy: %u\r\n",i,e->energy);
+    PRINTF("e: %x, energy: %u\r\n",i,e->energy);//TODO remove
 		worst_case_energy += e->energy * e->burst_num;
 	}
+  LFCN_DBG_PRINTF("Worst case e: %x\r\n",worst_case_energy);
   lower_thres = energy_to_volt(worst_case_energy);
+  if (lower_thres < DEFAULT_MIN_TASK_THRESH) {
+    lower_thres = DEFAULT_MIN_TASK_THRESH;
+  }
   //TODO poorly named... this should be upper_thres
   max_thres = lower_thres + 5; //TODO can't tolerate V resolution changes
   if (max_thres >= NUM_LEVEL) {
@@ -60,20 +64,26 @@ void calculate_energy_use(evt_t* e, unsigned v_before_event,
 	//PRINTF("Energy use vs: %u, ve: %u--> E: %u\r\n", v_before_event,
   //v_after_event,used_E & 0xffff);
 	// Always remember the worst-case energy
-	if (used_E > e->energy) {
-		// Update all reservedE with the same param with current
-		//for (unsigned i = 0; i < MODE_NUM; ++i) {
-      // If no param, than update all reservedE
-      //e->reservedE[i] = used_E;
-      e->energy = used_E;
-      glob_sqrt = used_E + V_OFF_SQUARED ;
-      e->V_safe = (uint16_t)local_sqrt();
-      LFCN_DBG_PRINTF("V_safe is:");
-      print_float(e->V_safe);
-      LFCN_DBG_PRINTF("from %u %u\r\n",v_before_event, v_after_event);
-		//}
-		update_comp();
-	}
+#ifdef CATNAP_DISABLE_RECALC
+  if (e->energy == 0) {
+#endif
+    if (used_E > e->energy) {
+      // Update all reservedE with the same param with current
+      //for (unsigned i = 0; i < MODE_NUM; ++i) {
+        // If no param, than update all reservedE
+        //e->reservedE[i] = used_E;
+        e->energy = used_E;
+        glob_sqrt = used_E + V_OFF_SQUARED ;
+        e->V_safe = (uint16_t)local_sqrt();
+        LFCN_DBG_PRINTF("V_safe is:");
+        print_float(e->V_safe);
+        LFCN_DBG_PRINTF("from %u %u\r\n",v_before_event, v_after_event);
+      //}
+      update_comp();
+    }
+#ifdef CATNAP_DISABLE_RECALC
+  }
+#endif
 }
 
 unsigned calculate_charge_rate(uint16_t t_charge_end, uint16_t t_charge_start)
@@ -94,7 +104,7 @@ unsigned calculate_charge_rate(uint16_t t_charge_end, uint16_t t_charge_start)
 		goto calculate_charge_rate_cleanup;
 	}
 	unsigned charge_time = t_charge_end - t_charge_start;
-
+  
 	// V does not go up above 1.9xV
 	// Thus, it may look like it is not charging properly
 	// We consider this case as "LARGE INCOMING ENERGY!"
@@ -137,7 +147,7 @@ unsigned calculate_charge_rate(uint16_t t_charge_end, uint16_t t_charge_start)
 	//uint32_t avg_charge_rate = get_charge_rate_average();
 	uint32_t worst_charge_rate = get_charge_rate_worst();
   // PRINTF("Charge rate: %u\r\n",worst_charge_rate);
-	//PRINTF("cr: %u %u\r\n", (unsigned)(worst_charge_rate >> 16), (unsigned)(worst_charge_rate & 0xFFFF));
+	PRINTF("cr: %u %u\r\n", (unsigned)(worst_charge_rate >> 16), (unsigned)(worst_charge_rate & 0xFFFF));
 
 	// Change mode if necessary
   //TODO use this?
@@ -147,9 +157,9 @@ unsigned calculate_charge_rate(uint16_t t_charge_end, uint16_t t_charge_start)
 	unsigned schedulable = is_schedulable(worst_charge_rate);
   if (!schedulable) {
     PRINTF("Not schedulable!\r\n");
-      BIT_FLIP(1,4);
+      BIT_FLIP(1,1);
    /* while(1) {
-      BIT_FLIP(1,4);
+      BIT_FLIP(1,1);
     }*/
 	}
 
@@ -179,8 +189,8 @@ unsigned is_schedulable(uint32_t charge_rate)
 		tmp = event->charge_time * event->burst_num;
 		tmp *= U_AMP_FACTOR; // Amplify
 		tmp /= (uint32_t)event->period;
-    //PRINTF("charge time: %u T: %u\r\n", (unsigned)event->charge_time,
-    //event->period);
+    LFCN_DBG_PRINTF("charge time: %u T: %u\r\n", (unsigned)event->charge_time,
+    event->period);
 		U += tmp;
 	}
 	//PRINTF("U: %x %x\r\n", (unsigned)(U >> 16), (unsigned)(U & 0xFFFF));
@@ -196,12 +206,12 @@ void calculate_C(uint32_t charge_rate)
 {
 	for (unsigned i = 0; i < MAX_EVENTS; ++i) {
 		evt_t* event = all_events.events[i];
-    if (event == NULL || event->valid == OFF) {
+    if (event == NULL || event == &EVT_FCN_STARTER) {
       continue;
     }
 		event->charge_time = (event->energy*AMP_FACTOR / charge_rate);
 		event->charge_time += 1; // Just so that it is never 0 (for degrading)
-   // PRINTF("Chrg_time: %u\r\n",event->charge_time);
+    PRINTF("Chrg_time: %u %u %u\r\n",event->charge_time, event->energy, charge_rate);
 	}
 }
 
@@ -246,7 +256,7 @@ uint8_t energy_to_volt(energy_t e) {
 	// linear search. Because I am lazy
   PRINTF("E: %x %x\r\n", (unsigned)(e >> 16),
     (unsigned)(e & 0xFFFF));
-	for (unsigned i = DEFAULT_MIN_THRES+1; i < NUM_LEVEL; ++i) {
+	for (unsigned i = DEFAULT_MIN_THRES_CALC +1; i < NUM_LEVEL; ++i) {
 		// TODO: This should be pre-calculated
 		energy_t e2 = level_to_E_catnap[i] - V_OFF_SQUARED;
 		if (e2 > e) {

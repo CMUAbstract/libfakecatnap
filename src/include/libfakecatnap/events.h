@@ -4,7 +4,8 @@ typedef enum evt_valid_ {
   OFF,
   WAITING,
   RDY,
-  DONE
+  DONE,
+  STARTED
 } evt_valid_t;
 
 typedef enum periodicity_ {
@@ -26,6 +27,7 @@ typedef struct evt_ {
   evt_valid_t valid;
   uint16_t period;
   uint8_t periodic;
+  uint8_t no_profile;
   uint16_t V_safe;
   float V_final;
   float V_min;
@@ -41,6 +43,7 @@ typedef struct evt_ {
     .burst_num = 1, /*TODO switch back to 1*/\
     .time_rdy = per, \
     .valid = WAITING, \
+    .no_profile = 0, \
     .V_safe = 0, \
     .V_min = 0, \
     .V_final = 0 \

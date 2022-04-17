@@ -2,6 +2,7 @@
 #define _LIBFAKECATNAP_HW_H_
 
 void start_timer(uint16_t time);
+void start_timer_running(void);
 
 void init_comparator();
 
@@ -36,11 +37,11 @@ extern volatile uint8_t  ISR_DISABLE;
 #ifndef LFCN_CONT_POWER
 
 #define LCFN_INTERRUPTS_ENABLE \
-  BIT_FLIP(1,4); \
+  BIT_FLIP(1,1); \
   ISR_DISABLE = 0;\
   /*if (comp_violation | (CECTL1 & CEOUT))*/\
-  if (comp_violation) { \
-    BIT_FLIP(1,4); \
+  if (comp_violation || (CECTL1 & CEOUT)) { \
+    BIT_FLIP(1,1); \
     CEINT |= CEIFG;\
   }\
 	CEINT |= (CEIE | CEIIE);\
@@ -81,5 +82,7 @@ do { \
 		ADC12CTL0 &= ~(ADC12ENC | ADC12ON);
 
 
+// mask for mode control bits in TAxCTL
+#define MC_MASK 0x30
 
 #endif
