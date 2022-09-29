@@ -102,12 +102,8 @@ void scheduler(void) {
           new_event = 0;
         }
         PRINTF("event! %x ",curctx->fifo->tsk_cnt);
-        //print_float(curctx->active_evt->V_final);
-        //print_float(curctx->active_evt->V_min);
         PRINTF("\r\n");
         #endif
-        //TODO fix this setting, we need to account for event time
-        //ticks_waited = TA0R;
         break;
       case TASK:
       case SLEEPING:
@@ -121,17 +117,12 @@ void scheduler(void) {
         }
         break;
     }
-    //dump_events();
     // Update feasibility, etc
-    //PRINTF("ticks:%u\r\n",ticks_waited);
     update_event_timers(ticks_waited);
     ticks_waited = 0;
     // Schedule something next
     evt_t * nextE = pick_event();
     LFCN_DBG_PRINTF("post pick %x \r\n",curctx->active_evt->valid);
-      /*print_float(curctx->active_evt->V_final);
-      print_float(curctx->active_evt->V_min);
-      PRINTF("\r\n");*/
     // If event, measure vcap
     if (nextE != NULL) {
       LFCN_DBG_PRINTF("NEXTE\r\n");
@@ -190,7 +181,6 @@ void scheduler(void) {
       else {
         tasks_ok = 0; // No tasks for now
         curctx->active_evt->valid = STARTED;
-        //PRINTF("Setting started!!!\r\n");
       }
     }
     // First set up timers to wait for an event
@@ -209,7 +199,6 @@ void scheduler(void) {
       LFCN_DBG_PRINTF("Set thresh %u, lvl %u\r\n",event_threshold,lower_thres);
       SET_LOWER_COMP(lower_thres); // Interrupt if we got below event thresh
       // Check if there's an active task, and jump to it if there is
-      //PRINTF("chkpt: %u,active task? %x, \r\n",curctx->active_task->valid_chkpt,curctx->active_task);
       if (curctx->active_task != NULL) {
         context_t *next = (curctx == &context_0 )? &context_1 : &context_0;
         next->active_task = curctx->active_task;
@@ -217,7 +206,6 @@ void scheduler(void) {
         next->active_evt = NULL;
         next->mode = TASK;
         LFCN_DBG_PRINTF("1mode:%u %u\r\n",curctx->mode,curctx->active_task->valid_chkpt);
-        //PRINTF("1mode:%u\r\n",curctx->mode);
         LCFN_INTERRUPTS_ENABLE;
         curctx = next;
         if (next->active_task->valid_chkpt) {
@@ -274,7 +262,6 @@ void scheduler(void) {
       v_charge_start = turn_on_read_adc(SCALER);
       t_start = TA0R;//TODO is the timer running here?
       LFCN_DBG_PRINTF("Ta0r: %x\r\n",TA0R);
-      //BIT_FLIP(3,5);
     }
     #endif
     // Else sleep to recharge
@@ -284,7 +271,6 @@ void scheduler(void) {
     BIT_FLIP(1,1);
     if(curctx->fifo->tsk_cnt == 0 && curctx->active_task == NULL) {
       LFCN_DBG_PRINTF("Set nothing!\r\n");
-      //SET_UPPER_COMP(DEFAULT_NEARLY_MAX_THRES);
     } else {
       LFCN_DBG_PRINTF("Upper thres: %x\r\n",max_thres);
       SET_MAX_UPPER_COMP(); // Set interrupt when we're fully charged too
@@ -293,7 +279,6 @@ void scheduler(void) {
     LFCN_DBG_PRINTF("Sleep\r\n");
     comp_e_flag = 1; // Flag to get us out
     LCFN_INTERRUPTS_ENABLE;
-    //LFCN_DBG_PRINTF("Sleeping for %u = %u",TA0CCR0,ticks_to_wait);
     __disable_interrupt();
       BIT_FLIP(1,1);
       BIT_FLIP(1,1);
@@ -303,11 +288,8 @@ void scheduler(void) {
       __bis_SR_register(SLEEP_BITS + GIE);
       BIT_FLIP(1,1);
       BIT_FLIP(1,1);
-      //LFCN_DBG_PRINTF("Woo!\r\n");
       __disable_interrupt();
     }
-    //BIT_FLIP(1,1);
-    //BIT_FLIP(1,1);
     LFCN_DBG_PRINTF("Wake\r\n");
     #ifdef CATNAP_FEASIBILITY
     if (curctx->mode != TASK) {
@@ -321,13 +303,11 @@ void scheduler(void) {
         LFCN_DBG_PRINTF("after sleep timer! %x %x %x\r\n",t_end,ticks_waited,t_start);
       }
       calculate_charge_rate(t_end,t_start);
-      //PRINTF("Got t_end!\r\n");
       t_end = 0;// this is ok because these vars are volatile
       t_start = 0;
     }
     #endif
     __enable_interrupt();
-    //LFCN_DBG_PRINTF("Wake!\r\n");
   }
 
   return; // Should not get here
@@ -356,17 +336,11 @@ void COMP_VBANK_ISR (void) {
   }
   comp_violation = 0;
   CEINT = 0;
-  //COMP_VBANK(INT) &= ~(COMP_VBANK(IE) | COMP_VBANK(IIE));
-  //COMP_VBANK(CTL1) &= ~COMP_VBANK(ON);
   DISABLE_LFCN_TIMER;// Just in case
   LFCN_DBG_PRINTF("in comp %x,\r\n",store);
-  //PRINTF("in comp %x, %x, %x\r\n",CECTL2,CECTL1,CECTL0);
-  //CEINT = ~(CEIFG | CEIIFG);
   volatile int chkpt_flag = 0;
   if (!(CECTL2 & CERSEL)) {
-  //LFCN_DBG_PRINTF("comp3\r\n");
     if ((LEVEL_MASK & CECTL2) == level_to_reg[DEFAULT_MIN_THRES]) {
-      //LFCN_DBG_PRINTF("comp4\r\n");
       switch (curctx->mode) {
         case CHARGING:
         case EVENT:
@@ -377,7 +351,6 @@ void COMP_VBANK_ISR (void) {
           break;
         }
         case TASK:{
-          //LFCN_DBG_PRINTF("Chkpt!\r\n");
           checkpoint();
           chkpt_flag = 1;
           if (chkpt_flag) {
@@ -454,13 +427,11 @@ timerISRHandler(void) {
 	TA0CCTL0 &= ~(CCIFG | CCIE); // Clear flag and stop int
 	//TA0CCTL0 &= ~(CCIFG); // Clear flag and stop int
 	CEINT &= ~CEIE; // Disable comp interrupt for our sanity
-  //LFCN_DBG_PRINTF("Timer %u\r\n",curctx->mode);
 /*--------------------------------------------------------*/
   // Record wait time
   ticks_waited = ticks_to_wait;
   TA0R = 0; // Not sure if we need this
   // If we're in a task, checkpoint it and move on
-  //PRINTF("timera0 %u\r\n",(TA0CCTL0 & CCIE));
   if ( curctx->mode == TASK) {
     LFCN_DBG_PRINTF("Chkpt3! %u\r\n",curctx->active_task->valid_chkpt);
     if (curctx->active_task->valid_chkpt) {

@@ -67,7 +67,6 @@ culpeo_V_t calc_culpeo_vsafe(void) {
   scale /= Vd_const_float;
   float Vd_scaled = Vd*scale;
   // scale = 1- Vd_scaled;
-  //print_float(scale);
   float Ve_squared = Vs_const_float + Voff_sq_float;
   float temp = Vfinal*Vfinal;
   temp *= n_ratio_float;
@@ -113,7 +112,6 @@ culpeo_V_t calc_culpeo_bucket(void) {
       LFCN_DBG_PRINTF("\r\n");
       if ((Vbucket - (e->V_final - e->V_min)) < V_off_float) {
         Vbucket = V_off_float + (e->V_final - e->V_min);
-        //PRINTF("inner mod\r\n");
       }
       //TODO we could optimize and add another variable to store Vbucket_sq since
       //we get it for free
@@ -228,8 +226,6 @@ void culpeo_charging(){
   }
   // Disable incoming power
   //TODO do we need this?
-  //P1OUT |= BIT1;
-  //P1DIR |= BIT1;
   __delay_cycles(80000);
 
   while( adc_reading > CULPEO_VHIGH){
@@ -246,16 +242,11 @@ void culpeo_charging(){
     ADC12CTL0 &= ~ADC12ENC;           // Disable ADC
     //burn
     for(int i = 0; i < 0xA0;i++){
-      //for(int j = 0; j < 0xff;j++){
         volatile temp = i;
-      //}
     }
     __delay_cycles(8000);
-    //PRINTF("Burn!\r\n");
   }
   LFCN_DBG_PRINTF("Go:%u\r\n",adc_reading);
-  //ADC12CTL0 &= ~(ADC12ON);
-  //REFTCL0 &= ~REFON;
   // Leave on for profiling
   adc_reading = 0;
 }
@@ -325,11 +316,7 @@ int profile_cleanup(evt_t *ev) {
     }
   }
   CULPEO_ADC_DISABLE;
-  //CULPEO_ADC_FULLY_OFF;
   // Re-enable incoming power
-  //P1OUT &= ~BIT1;
-  //__delay_cycles(80);
-  //P1DIR &= ~BIT1;
   LFCN_DBG_PRINTF("%u\r\n",temp);
   Vmin = (float)culpeo_min_reading/820.0;
   Vfinal = (float)max/820.0;
@@ -340,14 +327,12 @@ int profile_cleanup(evt_t *ev) {
   ev->V_final = Vfinal;
   new_event = 1;
   culpeo_profiling_flag = 0;
-  //CULPEO_ADC_DISABLE;
   return 0;
 }
 
 void __attribute__((interrupt(TIMER1_A0_VECTOR)))
 timerA1ISRHandler(void) {
     uint16_t val;
-    //PRINTF("ms timer\r\n");
     TA1R = 0;
     val = read_adc();
     if (culpeo_min_reading > val) {
